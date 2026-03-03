@@ -20,6 +20,21 @@ Console.InputEncoding = Encoding.UTF8;
 var isVerbose = args.Any(a => a is "--verbose" or "-v");
 var isJson = args.Contains("--json") || Environment.GetEnvironmentVariable("NR_JSON") == "1";
 
+// LLM documentation — handled before host build (no DI, no auth needed)
+var isLlm = args.Contains("--llm");
+var isLlmFull = args.Contains("--llm-full");
+
+if (isLlm || isLlmFull)
+{
+    if (isJson)
+        Console.WriteLine(LlmDocGenerator.GenerateJsonToolSchema());
+    else if (isLlmFull)
+        Console.WriteLine(LlmDocGenerator.GenerateFullMarkdown());
+    else
+        Console.WriteLine(LlmDocGenerator.GenerateConciseMarkdown());
+    return;
+}
+
 // Ensure config/log/token directories exist
 AppPaths.EnsureDirectoriesExist();
 
