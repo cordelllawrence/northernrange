@@ -26,12 +26,15 @@ var isLlmFull = args.Contains("--llm-full");
 
 if (isLlm || isLlmFull)
 {
+    // Remaining args after stripping flags become an optional filter (e.g. "messages", "send reply")
+    var filter = args.Where(a => a is not "--llm" and not "--llm-full" and not "--json").ToArray();
+
     if (isJson)
-        Console.WriteLine(LlmDocGenerator.GenerateJsonToolSchema());
+        Console.WriteLine(LlmDocGenerator.GenerateJsonToolSchema(filter));
     else if (isLlmFull)
-        Console.WriteLine(LlmDocGenerator.GenerateFullMarkdown());
+        Console.WriteLine(LlmDocGenerator.GenerateFullMarkdown(filter));
     else
-        Console.WriteLine(LlmDocGenerator.GenerateConciseMarkdown());
+        Console.WriteLine(LlmDocGenerator.GenerateConciseMarkdown(filter));
     return;
 }
 

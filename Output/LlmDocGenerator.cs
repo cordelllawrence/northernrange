@@ -48,10 +48,10 @@ public static class LlmDocGenerator
 
     // ── Public API ────────────────────────────────────────────────────
 
-    public static string GenerateConciseMarkdown()
+    public static string GenerateConciseMarkdown(string[]? filter = null)
     {
         var version = GetVersion();
-        var groups = ReflectCommandGroups();
+        var groups = ApplyFilter(ReflectCommandGroups(), filter);
         var globalOpts = ReflectGlobalOptions();
         var sb = new StringBuilder();
 
@@ -117,10 +117,10 @@ public static class LlmDocGenerator
         return sb.ToString().TrimEnd();
     }
 
-    public static string GenerateFullMarkdown()
+    public static string GenerateFullMarkdown(string[]? filter = null)
     {
         var version = GetVersion();
-        var groups = ReflectCommandGroups();
+        var groups = ApplyFilter(ReflectCommandGroups(), filter);
         var globalOpts = ReflectGlobalOptions();
         var sb = new StringBuilder();
 
@@ -266,10 +266,10 @@ public static class LlmDocGenerator
         return sb.ToString().TrimEnd();
     }
 
-    public static string GenerateJsonToolSchema()
+    public static string GenerateJsonToolSchema(string[]? filter = null)
     {
         var version = GetVersion();
-        var groups = ReflectCommandGroups();
+        var groups = ApplyFilter(ReflectCommandGroups(), filter);
         var globalOpts = ReflectGlobalOptions();
 
         var commands = new List<Dictionary<string, object?>>();
@@ -342,6 +342,39 @@ public static class LlmDocGenerator
         };
 
         return JsonSerializer.Serialize(schema, jsonOptions);
+    }
+
+    // ── Filtering ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Filter reflected command groups by optional args.
+    /// "messages" → only the messages group. "messages read" → only that subcommand.
+    /// Empty/null → no filtering.
+    /// </summary>
+    private static List<CommandGroupInfo> ApplyFilter(List<CommandGroupInfo> groups, string[]? filter)
+    {
+        if (filter is null || filter.Length == 0)
+            return groups;
+
+        var groupName = filter[0];
+        var subcommandName = filter.Length > 1 ? filter[1] : null;
+
+        var matched = groups.Where(g => g.Name.Equals(groupName, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matched.Count == 0)
+            return groups; // no match — return all rather than empty
+
+        if (subcommandName is not null)
+        {
+            matched = matched.Select(g =>
+            {
+                var filtered = g.Subcommands
+                    .Where(s => s.Name.Equals(subcommandName, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                return filtered.Count > 0 ? g with { Subcommands = filtered } : g;
+            }).ToList();
+        }
+
+        return matched;
     }
 
     // ── Reflection core ───────────────────────────────────────────────
