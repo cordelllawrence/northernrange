@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+
+# OAuth2 credentials — never commit these
+client_secrets.json
+client_Secrets.json
+client_secret*.json
+
+# User-specific token store
+tokens/
+
+# Logs
+logs/
+*.log
+
+# IDE / tooling
+.vs/
+.vscode/
+.claude/
+*.user
