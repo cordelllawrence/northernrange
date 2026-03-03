@@ -45,8 +45,9 @@ public class AuthService
         await using var stream = File.OpenRead(credentialsPath);
         var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
 
+        var receiver = new ConsoleCodeReceiver();
         credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-            secrets, Scopes, UserId, ct, tokenStore);
+            secrets, Scopes, UserId, ct, tokenStore, receiver);
 
         // Fetch email via Gmail profile
         var service = new GmailService(new BaseClientService.Initializer

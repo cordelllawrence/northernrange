@@ -445,6 +445,29 @@ Errors always go to **stderr** as plain text. **stdout** contains only the comma
 
 ---
 
+## Headless / Remote Server Login
+
+`nr auth login` works on headless servers (no GUI/browser). When a browser cannot be opened, the authorization URL is printed to the terminal so you can complete the flow manually:
+
+```
+Open this URL in your browser to authenticate:
+
+  https://accounts.google.com/o/oauth2/auth?...&redirect_uri=http://127.0.0.1:12345/authorize/&...
+
+Could not open a browser automatically.
+If you are on a remote server, either:
+  1. Use SSH port forwarding:  ssh -L 12345:127.0.0.1:12345 yourserver
+     then open the URL in your local browser.
+  2. Or, run 'nr auth login' on a machine with a browser and copy the
+     token file to this machine (see below).
+```
+
+**SSH port-forwarding flow:**
+
+1. Note the port number in the printed URL (e.g. `12345`)
+2. In a **new** terminal, reconnect with port forwarding: `ssh -L 12345:127.0.0.1:12345 yourserver`
+3. Open the URL in your local browser — the OAuth redirect will tunnel back to the server
+
 ## Machine-to-Machine Use (No Human Browser Flow)
 
 For fully automated scenarios where `nr auth login` can't be run interactively:
