@@ -9,6 +9,7 @@ using NorthernRange.Commands;
 using NorthernRange.Config;
 using NorthernRange.Gmail;
 using NorthernRange.Mime;
+using Cocona.Help;
 using NorthernRange.Output;
 
 // UTF-8 must be set before any output
@@ -71,6 +72,7 @@ try
             services.AddSingleton<LabelService>();
             services.AddSingleton<AttachmentService>();
             services.AddSingleton<OutputWriter>();
+            services.AddSingleton<ICoconaHelpRenderer, NrHelpRenderer>();
         })
         .RunAsync<NorthernRangeApp>(args);
 }

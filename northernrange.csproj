@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>nr</AssemblyName>
     <RootNamespace>NorthernRange</RootNamespace>
+    <Version>0.1.0</Version>
     <!-- Publish settings: single-file, self-contained, partial trim -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
