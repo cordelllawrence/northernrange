@@ -16,5 +16,17 @@ public record GlobalOptions(
     string? Credentials = null,
 
     [Option("config", Description = "Path to config.json. Overrides the default location.")]
-    string? Config = null
+    string? Config = null,
+
+    [Option("log", Description = "Enable JSONL debug logging to a timestamped file in the current directory.")]
+    bool Log = false,
+
+    [Option("log-flat", Description = "Enable structured text logging to a timestamped file in the current directory.")]
+    bool LogFlat = false,
+
+    [Option("log-file", Description = "Write log to this path (appends if exists). Format follows --log or --log-flat.")]
+    string? LogFile = null,
+
+    [Option("log-level", Description = "Minimum log level: verbose, debug, information (default), warning, error.")]
+    string? LogLevel = null
 ) : ICommandParameterSet;

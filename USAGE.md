@@ -19,6 +19,10 @@ Available on every command.
 | `-v` / `--verbose` | Emit debug diagnostics to stderr. Never affects stdout. |
 | `--credentials <path>` | Path to `client_secrets.json`. Overrides config and the default location. |
 | `--config <path>` | Path to `config.json`. Overrides the default location. |
+| `--log` | Enable JSONL debug logging to a timestamped file (`nr-YYYYMMDD.jsonl`) in the current directory. |
+| `--log-flat` | Enable structured text logging to a timestamped file (`nr-YYYYMMDD.log`) in the current directory. |
+| `--log-file <path>` | Write log to this path (appends if exists). Format follows `--log` or `--log-flat`. |
+| `--log-level <level>` | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error`. |
 
 Default credential path: `%APPDATA%\northernrange\client_secrets.json` (Windows) or `~/.config/northernrange/client_secrets.json` (macOS/Linux).
 

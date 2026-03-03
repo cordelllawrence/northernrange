@@ -20,6 +20,14 @@ Console.InputEncoding = Encoding.UTF8;
 var isVerbose = args.Any(a => a is "--verbose" or "-v");
 var isJson = args.Contains("--json") || Environment.GetEnvironmentVariable("NR_JSON") == "1";
 
+// Pre-scan log flags
+var isLog = args.Contains("--log");
+var isLogFlat = args.Contains("--log-flat");
+var logFileIdx = Array.IndexOf(args, "--log-file");
+var logFile = logFileIdx >= 0 && logFileIdx + 1 < args.Length ? args[logFileIdx + 1] : null;
+var logLevelIdx = Array.IndexOf(args, "--log-level");
+var logLevelStr = logLevelIdx >= 0 && logLevelIdx + 1 < args.Length ? args[logLevelIdx + 1] : null;
+
 // LLM documentation — handled before host build (no DI, no auth needed)
 var isLlm = args.Contains("--llm");
 var isLlmFull = args.Contains("--llm-full");
@@ -66,10 +74,33 @@ Log.Logger = new LoggerConfiguration()
             standardErrorFromLevel: LogEventLevel.Warning,
             restrictedToMinimumLevel: LogEventLevel.Warning,
             outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}"))
+    .WriteTo.Conditional(
+        _ => (isLog || logFile is not null) && !isLogFlat,
+        wt => wt.File(
+            formatter: new JsonlLogFormatter(),
+            path: logFile ?? Path.Combine(Environment.CurrentDirectory, "nr-.jsonl"),
+            rollingInterval: logFile is not null ? RollingInterval.Infinite : RollingInterval.Day,
+            restrictedToMinimumLevel: ParseLogLevel(logLevelStr),
+            shared: true))
+    .WriteTo.Conditional(
+        _ => isLogFlat || (logFile is not null && isLogFlat),
+        wt => wt.File(
+            path: logFile ?? Path.Combine(Environment.CurrentDirectory, "nr-.log"),
+            rollingInterval: logFile is not null ? RollingInterval.Infinite : RollingInterval.Day,
+            restrictedToMinimumLevel: ParseLogLevel(logLevelStr),
+            shared: true,
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}{Properties:j}{NewLine}"))
     .CreateLogger();
 
 try
 {
+    if (isLog || isLogFlat || logFile is not null)
+    {
+        var ext = isLogFlat ? ".log" : ".jsonl";
+        var resolvedPath = logFile ?? Path.GetFullPath($"nr-{DateTime.Now:yyyyMMdd}{ext}");
+        Console.Error.WriteLine($"log: {resolvedPath}");
+    }
+
     Log.Information("northernrange starting. Verbose={Verbose}, Json={Json}", isVerbose, isJson);
     Log.Debug("Config dir: {ConfigDir}", AppPaths.GetConfigDir());
 
@@ -104,3 +135,13 @@ finally
 {
     await Log.CloseAndFlushAsync();
 }
+
+static LogEventLevel ParseLogLevel(string? level) => level?.ToLowerInvariant() switch
+{
+    "verbose" => LogEventLevel.Verbose,
+    "debug" => LogEventLevel.Debug,
+    "warning" => LogEventLevel.Warning,
+    "error" => LogEventLevel.Error,
+    "fatal" => LogEventLevel.Fatal,
+    _ => LogEventLevel.Information,
+};
