@@ -29,48 +29,17 @@ public class SendCommands
         _logger       = logger;
     }
 
-    [Command("new", Description =
-        "Compose and send a new email message. " +
-        "Requires --to and --subject. " +
-        "Body text comes from --body, --body-file, or stdin (in that priority order). " +
-        "Add --draft to save as a draft instead of sending immediately. " +
-        "Attach local files with --attach (repeat the flag for multiple files). " +
-        "Examples: " +
-        "'nr send new --to alice@example.com --subject \"Hello\" --body \"Hi there\"' | " +
-        "'nr send new -t alice@example.com -t bob@example.com -s \"Report\" --body-file report.txt --attach report.pdf' | " +
-        "'echo \"Body text\" | nr send new -t alice@example.com -s \"Piped body\"' | " +
-        "'nr send new -t self@example.com -s \"Draft\" --body \"WIP\" --draft'")]
+    [Command("new", Description = "Compose and send a new message. Body from --body, --body-file, or stdin. Use --draft to save instead.")]
     public async Task NewAsync(
         GlobalOptions globals,
-        [Option('t', Description =
-            "Recipient email address. Repeat the flag for multiple recipients: -t a@b.com -t c@d.com. Required."
-        )] List<string>? to = null,
-        [Option('c', Description =
-            "CC email address. Repeat for multiple: --cc a@b.com --cc c@d.com."
-        )] List<string>? cc = null,
-        [Option("bcc", Description =
-            "BCC email address. Repeat for multiple. Recipients are hidden from each other."
-        )] List<string>? bcc = null,
-        [Option('s', Description =
-            "Email subject line. Required. Example: -s \"Weekly report\""
-        )] string? subject = null,
-        [Option("body", Description =
-            "Message body as inline text. If omitted, falls back to --body-file then stdin. " +
-            "Example: --body \"Hello, just checking in.\""
-        )] string? body = null,
-        [Option("body-file", Description =
-            "Path to a plain-text file whose contents become the message body. " +
-            "Takes priority over stdin. Example: --body-file ~/drafts/email.txt"
-        )] string? bodyFile = null,
-        [Option('a', Description =
-            "Path to a local file to attach. Repeat for multiple attachments: -a file1.pdf -a image.png. " +
-            "Example: -a ~/reports/q1.pdf"
-        )] List<string>? attach = null,
-        [Option("draft", Description =
-            "Save as a draft instead of sending immediately. " +
-            "The draft appears in Gmail Drafts and can be sent later with 'nr drafts send <draft-id>'. " +
-            "Example: --draft"
-        )] bool draft = false)
+        [Option('t', Description = "Recipient address. Repeat for multiple. Required.")] List<string>? to = null,
+        [Option('c', Description = "CC address. Repeat for multiple.")] List<string>? cc = null,
+        [Option("bcc", Description = "BCC address. Repeat for multiple.")] List<string>? bcc = null,
+        [Option('s', Description = "Subject line. Required.")] string? subject = null,
+        [Option("body", Description = "Body text inline. Falls back to --body-file then stdin if omitted.")] string? body = null,
+        [Option("body-file", Description = "Path to a plain-text file whose contents become the body.")] string? bodyFile = null,
+        [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
+        [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
     {
         var config   = _configLoader.Load(globals.Config);
         var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
@@ -128,37 +97,15 @@ public class SendCommands
         }
     }
 
-    [Command("reply", Description =
-        "Reply to an existing message. Subject, threading headers (In-Reply-To, References), " +
-        "and the thread ID are set automatically from the original message. " +
-        "By default replies only to the sender; use --reply-all to CC all original recipients. " +
-        "Body text comes from --body, --body-file, or stdin. " +
-        "Add --draft to save the reply as a draft instead of sending. " +
-        "Examples: " +
-        "'nr send reply 19cb08f9253d9482 --body \"Thanks, sounds good.\"' | " +
-        "'nr send reply <msg-id> --reply-all --body \"See attached\" --attach report.pdf' | " +
-        "'nr send reply <msg-id> --body \"WIP reply\" --draft'")]
+    [Command("reply", Description = "Reply to an existing message. Threading headers set automatically. Get IDs from 'nr messages list'.")]
     public async Task ReplyAsync(
         GlobalOptions globals,
-        [Argument(Description =
-            "Gmail message ID to reply to. " +
-            "Get it from 'nr messages list' or 'nr messages list --json'."
-        )] string messageId,
-        [Option("body", Description =
-            "Reply body text. If omitted, falls back to --body-file then stdin."
-        )] string? body = null,
-        [Option("body-file", Description =
-            "Path to a plain-text file whose contents become the reply body."
-        )] string? bodyFile = null,
-        [Option('a', Description =
-            "Path to a local file to attach. Repeat for multiple: -a file1.pdf -a image.png."
-        )] List<string>? attach = null,
-        [Option("reply-all", Description =
-            "CC all original recipients (To and Cc of the original message) in addition to replying to the sender."
-        )] bool replyAll = false,
-        [Option("draft", Description =
-            "Save the reply as a draft instead of sending immediately."
-        )] bool draft = false)
+        [Argument(Description = "Gmail message ID to reply to. Get from 'nr messages list'.")] string messageId,
+        [Option("body", Description = "Reply body text. Falls back to --body-file then stdin if omitted.")] string? body = null,
+        [Option("body-file", Description = "Path to a plain-text file whose contents become the reply body.")] string? bodyFile = null,
+        [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
+        [Option("reply-all", Description = "CC all original recipients (To + Cc) in addition to the sender.")] bool replyAll = false,
+        [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
     {
         var config    = _configLoader.Load(globals.Config);
         var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();

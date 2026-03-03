@@ -29,16 +29,10 @@ public class AttachmentsCommands
         _logger = logger;
     }
 
-    [Command("list", Description = "List all attachments in a message without downloading them. " +
-        "Shows filename, MIME type, and size for each attachment. " +
-        "Use --json to get the attachment IDs needed for the 'nr attachments download' command. " +
-        "Find messages with attachments using: 'nr messages list -q \"has:attachment\"'. " +
-        "Examples: 'nr attachments list 19c8fe3345e9052c' | 'nr attachments list <message-id> --json'")]
+    [Command("list", Description = "List attachments in a message without downloading. Use --json to get attachment IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Argument(Description = "Gmail message ID containing the attachments. " +
-            "Find messages with attachments using: 'nr messages list -q \"has:attachment\"'. " +
-            "The message ID appears in 'nr messages list' output.")] string messageId)
+        [Argument(Description = "Gmail message ID. Find messages with 'nr messages list -q \"has:attachment\"'.")] string messageId)
     {
         var config = _configLoader.Load(globals.Config);
         var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
@@ -95,26 +89,13 @@ public class AttachmentsCommands
         }
     }
 
-    [Command("download", Description = "Download an attachment from a message to disk. " +
-        "Get the message ID from 'nr messages list' and the attachment ID from 'nr attachments list <message-id> --json'. " +
-        "Without --output the file is written to the current directory using the original filename. " +
-        "Without --force the command exits with code 6 if the file already exists. " +
-        "Examples: 'nr attachments download <msg-id> <att-id>' | " +
-        "'nr attachments download <msg-id> <att-id> --output ~/Downloads' | " +
-        "'nr attachments download <msg-id> <att-id> --output ~/docs/report.pdf --force'")]
+    [Command("download", Description = "Download an attachment to disk. Get attachment IDs from 'nr attachments list <id> --json'.")]
     public async Task DownloadAsync(
         GlobalOptions globals,
-        [Argument(Description = "Gmail message ID that contains the attachment. " +
-            "Use 'nr messages list -q \"has:attachment\"' to find messages with attachments.")] string messageId,
-        [Argument(Description = "Attachment ID from 'nr attachments list <message-id> --json' (the 'attachmentId' field). " +
-            "Looks like: ANGjdJ_PiF0Gga...")] string attachmentId,
-        [Option('o', Description = "Destination file or directory path. " +
-            "If a directory path is given, the original attachment filename is used inside that directory. " +
-            "If omitted, the file is written to the current working directory using the original filename. " +
-            "Examples: -o ~/Downloads | -o ~/docs/report.pdf")] string? output = null,
-        [Option("force", Description = "Overwrite the output file if it already exists. " +
-            "Without this flag the command exits with code 6 when the destination file is already present. " +
-            "Example: --force")] bool force = false)
+        [Argument(Description = "Gmail message ID containing the attachment.")] string messageId,
+        [Argument(Description = "Attachment ID from 'nr attachments list <id> --json' (the 'attachmentId' field).")] string attachmentId,
+        [Option('o', Description = "Destination file or directory. Default: current directory using original filename.")] string? output = null,
+        [Option("force", Description = "Overwrite the output file if it already exists.")] bool force = false)
     {
         var config = _configLoader.Load(globals.Config);
         var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();

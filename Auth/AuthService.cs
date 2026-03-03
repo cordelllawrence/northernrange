@@ -178,7 +178,12 @@ public class AuthService
     {
         if (string.IsNullOrEmpty(email)) return;
         var path = Path.Combine(tokenStorePath, "user_info.json");
-        var json = JsonSerializer.Serialize(new { email, loginTime = DateTimeOffset.UtcNow });
+        var json = JsonSerializer.Serialize(
+            new { email, loginTime = DateTimeOffset.UtcNow },
+            new System.Text.Json.JsonSerializerOptions
+            {
+                TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
+            });
         await File.WriteAllTextAsync(path, json, ct);
     }
 

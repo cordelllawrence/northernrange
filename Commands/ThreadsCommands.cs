@@ -29,24 +29,13 @@ public class ThreadsCommands
         _logger = logger;
     }
 
-    [Command("list", Description = "List email threads from the mailbox. " +
-        "A thread groups an original message and all its replies into one conversation. " +
-        "Accepts the same --label, --query, --max, and --page-token flags as 'nr messages list'. " +
-        "Use 'nr threads read <id>' to view all messages in a thread. " +
-        "Examples: 'nr threads list' | 'nr threads list -q \"from:boss@company.com\" --json'")]
+    [Command("list", Description = "List email threads. Supports --label, --query, --max, and --page-token.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('l', Description = "Filter by label ID or display name (default: INBOX). " +
-            "System labels: INBOX, SENT, SPAM, TRASH, UNREAD, STARRED, DRAFT, IMPORTANT. " +
-            "User labels accept their display name or ID (see 'nr labels list'). " +
-            "Examples: -l UNREAD | -l SENT | -l \"Work/Projects\"")] string? label = null,
-        [Option('q', Description = "Gmail search query — same syntax as the Gmail search box. " +
-            "Examples: -q \"is:unread\" | -q \"from:alice@example.com\" | -q \"has:attachment subject:invoice\"")] string? query = null,
-        [Option('n', Description = "Maximum number of threads to return (1–500). Default: 25. " +
-            "Example: -n 50")] int? max = null,
-        [Option("page-token", Description = "Pagination token from a previous list response. " +
-            "When more results exist the output prints: 'Next page: nr threads list --page-token <token>'. " +
-            "Example: --page-token 09169338489761460975")] string? pageToken = null)
+        [Option('l', Description = "Filter by label ID or name (default: INBOX).")] string? label = null,
+        [Option('q', Description = "Gmail search query — same syntax as the Gmail search box.")] string? query = null,
+        [Option('n', Description = "Max threads to return (1–500). Default: 25.")] int? max = null,
+        [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null)
     {
         var config = _configLoader.Load(globals.Config);
         var effectiveLabel = label ?? config.DefaultLabel;
@@ -107,19 +96,11 @@ public class ThreadsCommands
         }
     }
 
-    [Command("read", Description = "Read all messages in a thread in chronological order. " +
-        "Shows each message's From, Date, and decoded body. " +
-        "Get thread IDs from 'nr threads list' or from the threadId field in 'nr messages list --json'. " +
-        "Examples: 'nr threads read 19cb04f07919b8a7' | 'nr threads read <id> --json'")]
+    [Command("read", Description = "Read all messages in a thread in chronological order. Get IDs from 'nr threads list'.")]
     public async Task ReadAsync(
         GlobalOptions globals,
-        [Argument(Description = "Gmail thread ID to read. " +
-            "Get IDs from 'nr threads list' or from the threadId field in 'nr messages list --json'.")] string id,
-        [Option("format", Description = "Content format for each message in the thread. " +
-            "'full' (default): decoded body text for every message. " +
-            "'metadata': headers only for each message — no body fetched. " +
-            "'minimal': IDs only, no headers or body. " +
-            "Example: --format metadata")] string format = "full")
+        [Argument(Description = "Gmail thread ID. Get from 'nr threads list'.")] string id,
+        [Option("format", Description = "'full' (default): body text. 'metadata': headers only. 'minimal': IDs only.")] string format = "full")
     {
         var config = _configLoader.Load(globals.Config);
         var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();

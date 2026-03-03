@@ -29,32 +29,14 @@ public class MessagesCommands
         _logger = logger;
     }
 
-    [Command("list", Description = "List messages from the mailbox. " +
-        "Returns From, Subject, Date, and a snippet for each message by default. " +
-        "Use --query for any Gmail search expression, --label to filter by label, and --json for machine-readable output. " +
-        "When more results exist, the output shows a 'Next page:' hint with the exact command to continue. " +
-        "Examples: 'nr messages list' | 'nr messages list -q \"is:unread has:attachment\" -n 50 --json'")]
+    [Command("list", Description = "List messages. Returns ID, From, Subject, Date, and snippet. See USAGE.md for query syntax and examples.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('l', Description = "Filter by label ID or display name (default: INBOX). " +
-            "System labels: INBOX, SENT, SPAM, TRASH, UNREAD, STARRED, DRAFT, IMPORTANT. " +
-            "User labels accept their display name or ID (see 'nr labels list'). " +
-            "Examples: -l UNREAD | -l SPAM | -l \"Work/Projects\"")] string? label = null,
-        [Option('q', Description = "Gmail search query — same syntax as the Gmail search box. " +
-            "The query is passed unmodified to the API. " +
-            "Examples: -q \"from:alice@example.com\" | -q \"is:unread has:attachment\" | " +
-            "-q \"subject:invoice after:2026/01/01\" | -q \"larger:5M filename:pdf\"")] string? query = null,
-        [Option('n', Description = "Maximum number of messages to return (1–500). Default: 25. " +
-            "Configurable via defaultMaxResults in config.json or the NR_MAX_RESULTS env var. " +
-            "Example: -n 100")] int? max = null,
-        [Option("page-token", Description = "Pagination token from a previous list response. " +
-            "When more results exist the output prints: 'Next page: nr messages list --page-token <token>'. " +
-            "Pass that token here to fetch the next page. " +
-            "Example: --page-token 07712902107382443779")] string? pageToken = null,
-        [Option("format", Description = "API response format. " +
-            "'metadata' (default): fetches From, Subject, Date, and snippet (one API call per message in parallel). " +
-            "'minimal': returns message ID and thread ID only — fastest, no extra API calls per message. " +
-            "Example: --format minimal")] string format = "metadata")
+        [Option('l', Description = "Filter by label ID or name (default: INBOX). Get user label IDs from 'nr labels list'.")] string? label = null,
+        [Option('q', Description = "Gmail search query — same syntax as the Gmail search box.")] string? query = null,
+        [Option('n', Description = "Max messages to return (1–500). Default: 25.")] int? max = null,
+        [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null,
+        [Option("format", Description = "'metadata' (default): headers + snippet. 'minimal': IDs only.")] string format = "metadata")
     {
         var config = _configLoader.Load(globals.Config);
         var effectiveLabel = label ?? config.DefaultLabel;
@@ -117,22 +99,12 @@ public class MessagesCommands
         }
     }
 
-    [Command("read", Description = "Read a single message by ID. " +
-        "Decodes the body (preferring plain text over HTML) and lists any attachments. " +
-        "Get message IDs from 'nr messages list'. " +
-        "Examples: 'nr messages read 19cb08f9253d9482' | 'nr messages read <id> --json' | 'nr messages read <id> --format raw > message.eml'")]
+    [Command("read", Description = "Read a single message by ID. Decodes body and lists attachments. Get IDs from 'nr messages list'.")]
     public async Task ReadAsync(
         GlobalOptions globals,
-        [Argument(Description = "Gmail message ID to read. " +
-            "Get IDs from 'nr messages list' or 'nr messages list --json'.")] string id,
-        [Option("format", Description = "Message content format. " +
-            "'full' (default): decoded body text and attachment list. " +
-            "'metadata': headers only — no body is fetched (faster). " +
-            "'raw': the original RFC 2822 message bytes written to stdout — pipe-friendly (e.g. redirect to .eml). " +
-            "Example: --format metadata | --format raw")] string format = "full",
-        [Option("include-headers", Description = "Comma-separated header names to include when using --format metadata. " +
-            "Default: From,To,Cc,Subject,Date,Message-ID. Header names are case-insensitive. " +
-            "Example: --include-headers \"From,Subject,X-Mailer\"")] string? includeHeaders = null)
+        [Argument(Description = "Gmail message ID. Get from 'nr messages list'.")] string id,
+        [Option("format", Description = "'full' (default): decoded body. 'metadata': headers only. 'raw': RFC 2822 bytes to stdout.")] string format = "full",
+        [Option("include-headers", Description = "Comma-separated headers to include with --format metadata. Default: From,To,Cc,Subject,Date,Message-ID.")] string? includeHeaders = null)
     {
         var config = _configLoader.Load(globals.Config);
         var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();

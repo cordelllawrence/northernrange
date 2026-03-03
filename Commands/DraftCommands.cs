@@ -29,16 +29,10 @@ public class DraftCommands
         _logger       = logger;
     }
 
-    [Command("list", Description =
-        "List saved drafts. Shows Draft ID, date, recipient, and subject for each draft. " +
-        "Use --json to get the draft IDs needed for 'nr drafts send' and 'nr drafts delete'. " +
-        "Drafts are sorted newest-first. " +
-        "Examples: 'nr drafts list' | 'nr drafts list -n 10 --json'")]
+    [Command("list", Description = "List saved drafts sorted newest-first. Use --json to get draft IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('n', Description =
-            "Maximum number of drafts to return (1–100). Default: 25. Example: -n 10"
-        )] int max = 25)
+        [Option('n', Description = "Max drafts to return (1–100). Default: 25.")] int max = 25)
     {
         var config    = _configLoader.Load(globals.Config);
         var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
@@ -96,16 +90,10 @@ public class DraftCommands
         }
     }
 
-    [Command("send", Description =
-        "Send an existing draft immediately. The draft is removed from Drafts after sending. " +
-        "Get the draft ID from 'nr drafts list --json' (the 'draftId' field). " +
-        "Examples: 'nr drafts send r123456789' | 'nr drafts send <draft-id> --json'")]
+    [Command("send", Description = "Send an existing draft immediately. Get draft IDs from 'nr drafts list --json'.")]
     public async Task SendAsync(
         GlobalOptions globals,
-        [Argument(Description =
-            "Draft ID to send. Get it from 'nr drafts list' or 'nr drafts list --json'. " +
-            "Looks like: r8234567890123456"
-        )] string draftId)
+        [Argument(Description = "Draft ID to send. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
         var config    = _configLoader.Load(globals.Config);
         var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
@@ -144,15 +132,10 @@ public class DraftCommands
         }
     }
 
-    [Command("delete", Description =
-        "Permanently delete a draft. This cannot be undone. " +
-        "Get the draft ID from 'nr drafts list --json' (the 'draftId' field). " +
-        "Examples: 'nr drafts delete r123456789'")]
+    [Command("delete", Description = "Permanently delete a draft. Cannot be undone. Get draft IDs from 'nr drafts list --json'.")]
     public async Task DeleteAsync(
         GlobalOptions globals,
-        [Argument(Description =
-            "Draft ID to delete. Get it from 'nr drafts list' or 'nr drafts list --json'."
-        )] string draftId)
+        [Argument(Description = "Draft ID to delete. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
         var config    = _configLoader.Load(globals.Config);
         var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
