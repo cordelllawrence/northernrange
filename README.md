@@ -11,7 +11,7 @@ A focused, read-only Gmail command-line interface built for programmatic use.
 Most Gmail tools are built around interactive UIs. `nr` is built around the opposite philosophy:
 
 - **Headless-first.** `--json` output is a stable contract. Agents and scripts can depend on it.
-- **Read-only.** Phase 1 intentionally does nothing that modifies your mailbox — no sends, no deletes, no label changes. Safe to embed in any automated pipeline.
+- **Safe by default.** Destructive operations (delete, label changes) are not supported. Sending and drafts are opt-in commands with clear intent.
 - **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token and log files.
 - **Composable.** List commands produce paginated JSON with `nextPageToken`. Output is pipe-friendly.
 - **Self-contained binary.** A single executable with no .NET runtime installation required on the target machine.
@@ -344,6 +344,10 @@ These flags are accepted by every command:
 | `--verbose` | `-v` | Emit debug-level diagnostic output to stderr |
 | `--credentials <path>` | | Path to `client_secrets.json` (overrides config and default location) |
 | `--config <path>` | | Path to `config.json` (overrides default location) |
+| `--log` | | Enable JSONL debug logging to a timestamped file (`nr-YYYYMMDD.jsonl`) in the current directory |
+| `--log-flat` | | Enable structured text logging to a timestamped file (`nr-YYYYMMDD.log`) in the current directory |
+| `--log-file <path>` | | Write log to this path (appends if exists). Format follows `--log` or `--log-flat` |
+| `--log-level <level>` | | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error` |
 
 ---
 
@@ -469,15 +473,14 @@ Logs roll daily and are retained for 7 days. No email content is ever written to
 
 ---
 
-## Phase 2 (Planned)
+## Roadmap
 
-Phase 1 is intentionally read-only. Phase 2 will add:
+Sending and drafts are now supported. Planned additions:
 
-- `nr messages send` — compose and send
-- `nr messages reply` / `forward`
 - Label management (create, rename, delete)
 - Marking messages read / unread
 - Moving and archiving messages
+- Forwarding messages
 
 ---
 
@@ -492,3 +495,9 @@ Phase 1 is intentionally read-only. Phase 2 will add:
 | MIME parsing | MimeKit 4.x |
 | Rich output | Spectre.Console |
 | Logging | Serilog → Microsoft.Extensions.Logging |
+
+---
+
+## About the Name
+
+The name "Northern Range" is a play on [Himalaya](https://github.com/pimalaya/himalaya), a popular CLI email client. It is inspired by the Northern Range — the mountain range found in the northern part of the island of Trinidad in the twin island republic of Trinidad and Tobago, where this tool was developed. 😊
