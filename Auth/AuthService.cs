@@ -14,7 +14,7 @@ namespace NorthernRange.Auth;
 public class AuthService
 {
     private const string UserId = "user";
-    private static readonly string[] Scopes = [GmailService.Scope.GmailReadonly];
+    private static readonly string[] Scopes = [GmailService.Scope.GmailModify];
 
     private readonly ILogger<AuthService> _logger;
 

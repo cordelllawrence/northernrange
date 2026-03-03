@@ -72,6 +72,7 @@ try
             services.AddSingleton<LabelService>();
             services.AddSingleton<AttachmentService>();
             services.AddSingleton<OutputWriter>();
+            services.AddSingleton<SendService>();
             services.AddSingleton<ICoconaHelpRenderer, NrHelpRenderer>();
         })
         .RunAsync<NorthernRangeApp>(args);
