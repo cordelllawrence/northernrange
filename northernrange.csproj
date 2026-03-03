@@ -12,8 +12,8 @@
     <SelfContained>true</SelfContained>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
-    <!-- Suppress IL2026: partial trimming preserves all NuGet assemblies; JsonSerializer is safe here -->
-    <NoWarn>$(NoWarn);IL2026</NoWarn>
+    <!-- Suppress trim warnings: TrimMode=partial never trims NuGet assemblies, so IL2026/IL2104 are safe to ignore -->
+    <NoWarn>$(NoWarn);IL2026;IL2104</NoWarn>
     <PublishReadyToRun>true</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
