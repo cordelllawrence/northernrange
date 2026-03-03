@@ -29,7 +29,12 @@ public class LabelsCommands
         _logger = logger;
     }
 
-    [Command("list", Description = "List all labels in the mailbox")]
+    [Command("list", Description = "List all labels in the mailbox — both Gmail system labels " +
+        "(INBOX, SENT, SPAM, TRASH, UNREAD, STARRED, DRAFT, IMPORTANT, CATEGORY_*) " +
+        "and any user-created labels. " +
+        "Use the label ID or name with 'nr messages list --label' to filter messages. " +
+        "Use 'nr labels info <id>' to see message counts and color for a specific label. " +
+        "Examples: 'nr labels list' | 'nr labels list --json'")]
     public async Task ListAsync(GlobalOptions globals)
     {
         var config = _configLoader.Load(globals.Config);
@@ -74,10 +79,15 @@ public class LabelsCommands
         }
     }
 
-    [Command("info", Description = "Show details for a single label")]
+    [Command("info", Description = "Show detailed information for a single label: " +
+        "message counts, thread counts, unread counts, and color settings for user labels. " +
+        "Accepts either a label ID (e.g. INBOX, Label_18) or a display name (e.g. 'Work/Projects'). " +
+        "If a display name matches more than one label, the command exits with code 2. " +
+        "Examples: 'nr labels info INBOX' | 'nr labels info \"Financial Updates\"' | 'nr labels info Label_18 --json'")]
     public async Task InfoAsync(
         GlobalOptions globals,
-        [Argument(Description = "Label ID or name")] string id)
+        [Argument(Description = "Label ID (e.g. INBOX, SENT, Label_18) or display name (e.g. 'Financial Updates'). " +
+            "Label IDs and names are shown by 'nr labels list'.")] string id)
     {
         var config = _configLoader.Load(globals.Config);
         var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
