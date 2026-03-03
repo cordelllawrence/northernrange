@@ -62,7 +62,18 @@ public static class PlainTextRenderer
 
         // Wide (2 columns): emoji, CJK, Hangul, fullwidth forms
         if (cp is (>= 0x1100 and <= 0x115F)            // Hangul Jamo
-               or (>= 0x2329 and <= 0x232A)            // CJK angle brackets
+               or (>= 0x231A and <= 0x231B)            // ⌚⌛ watch, hourglass
+               or (>= 0x23E9 and <= 0x23FA)            // ⏩-⏺ AV/clock buttons
+               or (>= 0x25AA and <= 0x25AB)            // ▪▫ small squares
+               or (>= 0x25B6 and <= 0x25B6)            // ▶ play
+               or (>= 0x25C0 and <= 0x25C0)            // ◀ reverse
+               or (>= 0x25FB and <= 0x25FE)            // ◻-◾ medium squares
+               or (>= 0x2600 and <= 0x27BF)            // ☀✨⚡✅❌ Misc Symbols + Dingbats
+               or (>= 0x2934 and <= 0x2935)            // ⤴⤵ curved arrows
+               or (>= 0x2B05 and <= 0x2B07)            // ⬅⬆⬇ arrows
+               or (>= 0x2B1B and <= 0x2B1C)            // ⬛⬜ large squares
+               or (>= 0x2B50 and <= 0x2B50)            // ⭐ star
+               or (>= 0x2B55 and <= 0x2B55)            // ⭕ circle
                or (>= 0x2E80 and <= 0x3247)            // CJK Radicals, Kangxi, etc.
                or (>= 0x3250 and <= 0x4DBF)            // CJK Bopomofo, Extension A
                or (>= 0x4E00 and <= 0xA4C6)            // CJK Unified Ideographs
