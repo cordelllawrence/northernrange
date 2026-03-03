@@ -17,7 +17,9 @@ public class NrHelpRenderer : ICoconaHelpRenderer
 
     public string Render(HelpMessage message)
     {
-        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.1.0";
+        var raw = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.1.0";
+        var version = raw.Split('+')[0];
         var header = $"northernrange v{version} — A read-only Gmail CLI for scripts, AI agents, and power users\n\n";
 
         var body = _inner.Render(message);

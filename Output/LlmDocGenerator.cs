@@ -474,7 +474,9 @@ public static class LlmDocGenerator
 
     private static string GetVersion()
     {
-        return Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.1.0";
+        var raw = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.1.0";
+        return raw.Split('+')[0];
     }
 
     private static string FormatTypeName(Type type)
