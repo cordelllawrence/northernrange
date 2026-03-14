@@ -19,6 +19,7 @@ Available on every command.
 | `-v` / `--verbose` | Emit debug diagnostics to stderr. Never affects stdout. |
 | `--credentials <path>` | Path to `client_secrets.json`. Overrides config and the default location. |
 | `--config <path>` | Path to `config.json`. Overrides the default location. |
+| `--account <name>` | Account name to use. Overrides `NR_ACCOUNT` env var and config `defaultAccount`. Default: `"default"`. |
 | `--log` | Enable JSONL debug logging to a timestamped file (`nr-YYYYMMDD.jsonl`) in the current directory. |
 | `--log-flat` | Enable structured text logging to a timestamped file (`nr-YYYYMMDD.log`) in the current directory. |
 | `--log-file <path>` | Write log to this path (appends if exists). Format follows `--log` or `--log-flat`. |
@@ -32,35 +33,53 @@ Default credential path: `%APPDATA%\northernrange\client_secrets.json` (Windows)
 
 ### `nr auth login`
 
-Authenticate with Gmail via the OAuth2 browser flow. Opens your browser to Google's consent screen; the refresh token is stored locally. Run once — all subsequent commands authenticate silently.
+Authenticate with Gmail via the OAuth2 browser flow. Opens your browser to Google's consent screen; the refresh token is stored locally. Run once per account — all subsequent commands authenticate silently.
 
-Requires a `client_secrets.json` (OAuth2 Desktop client ID, downloaded from Google Cloud Console → APIs & Services → Credentials).
+Use `--account` to log in additional Gmail accounts. The account is auto-created in `config.json` on successful login. On headless servers (no browser), the auth URL is printed to the terminal for manual completion.
 
 ```
 nr auth login
-nr auth login --credentials ~/secrets/client_secrets.json
+nr auth login --account work
+nr auth login --account personal --credentials ~/secrets/other_client_secrets.json
 nr auth login --force
 ```
 
 | Option | Description |
 |---|---|
-| `--force` | Delete the stored token and re-run the full browser consent flow. Use after revoking a token, switching accounts, or changing OAuth scopes. |
+| `--force` | Delete the stored token and re-run the full browser consent flow. |
+| `--account <name>` | Account name. Default: config `defaultAccount` or `"default"`. Auto-created on first login. |
 
 ### `nr auth logout`
 
-Revoke the OAuth2 token with Google and delete it locally. After logout, all Gmail commands exit with code 3.
+Revoke the OAuth2 token with Google and delete it locally. After logout, commands using this account exit with code 3.
 
 ```
 nr auth logout
+nr auth logout --account work
 ```
 
 ### `nr auth status`
 
-Show authentication state: account email, token expiry, and validity. Reads the local token store only — no network request. Exit code 0 if authenticated, 3 if not.
+Show authentication state. Without `--account`, shows **all** configured accounts. With `--account`, shows one. Reads the local token store only — no network request. Exit code 0 if any account is authenticated, 3 if none.
 
 ```
 nr auth status
+nr auth status --account work
 nr auth status --json
+```
+
+Example multi-account output:
+
+```
+Account:        default (default)
+Authenticated:  True
+Email:          user@gmail.com
+Token expires:  2026-03-03 00:55:06Z (valid)
+
+Account:        work
+Authenticated:  True
+Email:          user@company.com
+Token expires:  2026-03-03 01:12:00Z (valid)
 ```
 
 ---

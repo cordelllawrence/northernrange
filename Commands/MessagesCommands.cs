@@ -11,20 +11,20 @@ public class MessagesCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly MessageService _messageService;
-    private readonly ConfigLoader _configLoader;
+    private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<MessagesCommands> _logger;
 
     public MessagesCommands(
         GmailClientFactory gmailFactory,
         MessageService messageService,
-        ConfigLoader configLoader,
+        AccountResolver resolver,
         OutputWriter output,
         ILogger<MessagesCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _messageService = messageService;
-        _configLoader = configLoader;
+        _resolver = resolver;
         _output = output;
         _logger = logger;
     }
@@ -38,9 +38,9 @@ public class MessagesCommands
         [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null,
         [Option("format", Description = "'metadata' (default): headers + snippet. 'minimal': IDs only.")] string format = "metadata")
     {
-        var config = _configLoader.Load(globals.Config);
-        var effectiveLabel = label ?? config.DefaultLabel;
-        var effectiveMax = max ?? config.DefaultMaxResults;
+        var ctx = _resolver.Resolve(globals);
+        var effectiveLabel = label ?? ctx.Config.DefaultLabel;
+        var effectiveMax = max ?? ctx.Config.DefaultMaxResults;
 
         if (effectiveMax is < 1 or > 500)
         {
@@ -49,14 +49,12 @@ public class MessagesCommands
             return;
         }
 
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
             using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "messages.list" });
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result = await _messageService.ListAsync(gmail, effectiveLabel, query, effectiveMax, pageToken, format);
 
             if (mode == OutputMode.Json)
@@ -77,7 +75,7 @@ public class MessagesCommands
                 m.Id,
                 PlainTextRenderer.Truncate(m.From, 30),
                 PlainTextRenderer.Truncate(m.Subject, 40),
-                PlainTextRenderer.FormatDate(m.Date, config.DateFormat),
+                PlainTextRenderer.FormatDate(m.Date, ctx.Config.DateFormat),
                 PlainTextRenderer.Truncate(m.Snippet, 60)
             }).ToList();
 
@@ -106,10 +104,8 @@ public class MessagesCommands
         [Option("format", Description = "'full' (default): decoded body. 'metadata': headers only. 'raw': RFC 2822 bytes to stdout.")] string format = "full",
         [Option("include-headers", Description = "Comma-separated headers to include with --format metadata. Default: From,To,Cc,Subject,Date,Message-ID.")] string? includeHeaders = null)
     {
-        var config = _configLoader.Load(globals.Config);
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         var headerNames = string.IsNullOrEmpty(includeHeaders)
             ? null
@@ -123,7 +119,7 @@ public class MessagesCommands
                 ["MessageId"] = id
             });
 
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var message = await _messageService.GetAsync(gmail, id, format, headerNames);
 
             if (mode == OutputMode.Json)

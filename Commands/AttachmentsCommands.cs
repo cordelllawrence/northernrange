@@ -11,20 +11,20 @@ public class AttachmentsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly AttachmentService _attachmentService;
-    private readonly ConfigLoader _configLoader;
+    private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<AttachmentsCommands> _logger;
 
     public AttachmentsCommands(
         GmailClientFactory gmailFactory,
         AttachmentService attachmentService,
-        ConfigLoader configLoader,
+        AccountResolver resolver,
         OutputWriter output,
         ILogger<AttachmentsCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _attachmentService = attachmentService;
-        _configLoader = configLoader;
+        _resolver = resolver;
         _output = output;
         _logger = logger;
     }
@@ -34,10 +34,8 @@ public class AttachmentsCommands
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID. Find messages with 'nr messages list -q \"has:attachment\"'.")] string messageId)
     {
-        var config = _configLoader.Load(globals.Config);
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
@@ -47,7 +45,7 @@ public class AttachmentsCommands
                 ["MessageId"] = messageId
             });
 
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result = await _attachmentService.ListFromMessageAsync(gmail, messageId);
 
             if (mode == OutputMode.Json)
@@ -97,10 +95,8 @@ public class AttachmentsCommands
         [Option('o', Description = "Destination file or directory. Default: current directory using original filename.")] string? output = null,
         [Option("force", Description = "Overwrite the output file if it already exists.")] bool force = false)
     {
-        var config = _configLoader.Load(globals.Config);
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
@@ -111,7 +107,7 @@ public class AttachmentsCommands
                 ["AttachmentId"] = attachmentId
             });
 
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result = await _attachmentService.DownloadAsync(gmail, messageId, attachmentId, output, force);
 
             if (mode == OutputMode.Json)

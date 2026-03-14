@@ -18,6 +18,9 @@ public record GlobalOptions(
     [Option("config", Description = "Path to config.json. Overrides the default location.")]
     string? Config = null,
 
+    [Option("account", Description = "Account name to use. Overrides NR_ACCOUNT env var and config defaultAccount.")]
+    string? Account = null,
+
     [Option("log", Description = "Enable JSONL debug logging to a timestamped file in the current directory.")]
     bool Log = false,
 

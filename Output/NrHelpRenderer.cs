@@ -51,6 +51,8 @@ public class NrHelpRenderer : ICoconaHelpRenderer
         sb.AppendLine();
         sb.AppendLine("  --config <path>           Path to config.json");
         sb.AppendLine();
+        sb.AppendLine("  --account <name>          Account name to use (overrides NR_ACCOUNT and config)");
+        sb.AppendLine();
         sb.AppendLine("  --log                     Enable JSONL debug logging to a timestamped file");
         sb.AppendLine();
         sb.AppendLine("  --log-flat                Enable structured text logging to a timestamped file");

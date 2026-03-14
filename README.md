@@ -85,21 +85,25 @@ This opens your default browser for Google's OAuth2 consent screen. After you ap
 ## Authentication Commands
 
 ```
-nr auth login [--force]
-nr auth logout
-nr auth status
+nr auth login [--account <name>] [--force]
+nr auth logout [--account <name>]
+nr auth status [--account <name>]
 ```
+
+Multiple Gmail accounts are supported. Use `--account` to target a specific account. Without it, the default account is used (configurable via `defaultAccount` in `config.json` or `NR_ACCOUNT` env var).
 
 #### `auth login`
 
-Opens the OAuth2 browser flow. Uses the `gmail.readonly` scope — read-only access only.
+Opens the OAuth2 browser flow. On headless servers the auth URL is printed to the terminal. The account is auto-created in `config.json` on success.
 
 | Flag | Description |
 |---|---|
+| `--account <name>` | Account alias (e.g. `work`, `personal`). Default: `"default"`. |
 | `--force` | Re-run the browser flow even if a valid token already exists |
 
 ```
 nr auth login
+nr auth login --account work
 nr auth login --force
 ```
 
@@ -109,20 +113,28 @@ Revokes the token with Google and deletes the local token file.
 
 ```
 nr auth logout
+nr auth logout --account work
 ```
 
 #### `auth status`
 
-Reports authentication state without any network call. Shows account email and token expiry.
+Reports authentication state without any network call. Without `--account`, shows all configured accounts.
 
 ```
 nr auth status
+nr auth status --account work
 ```
 
 ```
+Account:        default (default)
 Authenticated:  True
-Account:        user@gmail.com
+Email:          user@gmail.com
 Token expires:  2026-03-03 00:55:06Z (valid)
+
+Account:        work
+Authenticated:  True
+Email:          user@company.com
+Token expires:  2026-03-03 01:12:00Z (valid)
 ```
 
 ---
@@ -344,6 +356,7 @@ These flags are accepted by every command:
 | `--verbose` | `-v` | Emit debug-level diagnostic output to stderr |
 | `--credentials <path>` | | Path to `client_secrets.json` (overrides config and default location) |
 | `--config <path>` | | Path to `config.json` (overrides default location) |
+| `--account <name>` | | Account name to use. Overrides `NR_ACCOUNT` env and config `defaultAccount`. Default: `"default"` |
 | `--log` | | Enable JSONL debug logging to a timestamped file (`nr-YYYYMMDD.jsonl`) in the current directory |
 | `--log-flat` | | Enable structured text logging to a timestamped file (`nr-YYYYMMDD.log`) in the current directory |
 | `--log-file <path>` | | Write log to this path (appends if exists). Format follows `--log` or `--log-flat` |
@@ -362,6 +375,11 @@ The config file is optional. All settings have defaults.
 
 ```json
 {
+  "defaultAccount": "personal",
+  "accounts": {
+    "personal": {},
+    "work": { "credentialsPath": "/path/to/work_client_secrets.json" }
+  },
   "defaultLabel": "INBOX",
   "defaultMaxResults": 25,
   "defaultOutputFormat": "text",
@@ -373,17 +391,20 @@ The config file is optional. All settings have defaults.
 
 | Setting | Default | Description |
 |---|---|---|
+| `defaultAccount` | `null` → `"default"` | Account used when `--account` is not specified |
+| `accounts` | `null` | Named account configurations. Each key is an alias; value may contain `credentialsPath` override |
 | `defaultLabel` | `"INBOX"` | Default label for list commands when `--label` is not specified |
 | `defaultMaxResults` | `25` | Default `--max` for list commands |
 | `defaultOutputFormat` | `"text"` | Set to `"json"` to always output JSON (equivalent to always passing `--json`) |
 | `dateFormat` | `"iso8601"` | `"iso8601"` or `"local"` for plain text date display |
-| `credentialsPath` | `null` | Absolute path to `client_secrets.json` |
+| `credentialsPath` | `null` | Absolute path to `client_secrets.json` (global default; per-account overrides in `accounts`) |
 | `httpTimeoutSeconds` | `30` | Timeout per HTTP request to the Gmail API |
 
 ### Environment variables
 
 | Variable | Equivalent to |
 |---|---|
+| `NR_ACCOUNT` | `--account` flag |
 | `NR_CREDENTIALS` | `--credentials` flag |
 | `NR_CONFIG` | `--config` flag |
 | `NR_DEFAULT_LABEL` | `defaultLabel` config key |
@@ -472,12 +493,14 @@ If you are on a remote server, either:
 
 For fully automated scenarios where `nr auth login` can't be run interactively:
 
-**Personal Gmail:** Complete the browser flow once on any machine, then copy the token file to the target machine:
+**Personal Gmail:** Complete the browser flow once on any machine, then copy the token directory to the target machine. Each account has its own subdirectory:
 
-| Platform | Token file |
+| Platform | Token directory |
 |---|---|
-| Windows | `%APPDATA%\northernrange\tokens\Google.Apis.Auth.OAuth2.Responses.TokenResponse-user` |
-| macOS / Linux | `~/.config/northernrange/tokens/Google.Apis.Auth.OAuth2.Responses.TokenResponse-user` |
+| Windows | `%APPDATA%\northernrange\tokens\<account>\` |
+| macOS / Linux | `~/.config/northernrange/tokens/<account>/` |
+
+For the default account, `<account>` is `default`.
 
 The refresh token is long-lived. It survives indefinitely for Google Cloud projects in production status, and for 6 months of inactivity on projects in testing status.
 
@@ -489,8 +512,10 @@ The refresh token is long-lived. It survives indefinitely for Google Cloud proje
 
 | Platform | Config | Tokens | Logs |
 |---|---|---|---|
-| Windows | `%APPDATA%\northernrange\` | `%APPDATA%\northernrange\tokens\` | `%APPDATA%\northernrange\logs\` |
-| macOS / Linux | `~/.config/northernrange/` | `~/.config/northernrange/tokens/` | `~/.config/northernrange/logs/` |
+| Windows | `%APPDATA%\northernrange\` | `%APPDATA%\northernrange\tokens\<account>\` | `%APPDATA%\northernrange\logs\` |
+| macOS / Linux | `~/.config/northernrange/` | `~/.config/northernrange/tokens/<account>/` | `~/.config/northernrange/logs/` |
+
+Each account's tokens are stored in a separate subdirectory (e.g. `tokens/default/`, `tokens/work/`). Existing single-account installs are auto-migrated to `tokens/default/` on first run.
 
 Logs roll daily and are retained for 7 days. No email content is ever written to disk except when explicitly using `attachments download`.
 

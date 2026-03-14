@@ -11,20 +11,20 @@ public class LabelsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly LabelService _labelService;
-    private readonly ConfigLoader _configLoader;
+    private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<LabelsCommands> _logger;
 
     public LabelsCommands(
         GmailClientFactory gmailFactory,
         LabelService labelService,
-        ConfigLoader configLoader,
+        AccountResolver resolver,
         OutputWriter output,
         ILogger<LabelsCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _labelService = labelService;
-        _configLoader = configLoader;
+        _resolver = resolver;
         _output = output;
         _logger = logger;
     }
@@ -32,15 +32,13 @@ public class LabelsCommands
     [Command("list", Description = "List all labels (system and user-created). Use IDs with 'nr messages list --label'.")]
     public async Task ListAsync(GlobalOptions globals)
     {
-        var config = _configLoader.Load(globals.Config);
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
             using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "labels.list" });
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result = await _labelService.ListAsync(gmail);
 
             if (mode == OutputMode.Json)
@@ -79,10 +77,8 @@ public class LabelsCommands
         GlobalOptions globals,
         [Argument(Description = "Label ID or display name. Get IDs from 'nr labels list'.")] string id)
     {
-        var config = _configLoader.Load(globals.Config);
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
@@ -92,7 +88,7 @@ public class LabelsCommands
                 ["LabelId"] = id
             });
 
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var label = await _labelService.GetAsync(gmail, id);
 
             if (mode == OutputMode.Json)

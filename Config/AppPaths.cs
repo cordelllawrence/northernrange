@@ -48,6 +48,31 @@ public static class AppPaths
                 TrySetUnixPermissions(dir);
             }
         }
+
+        MigrateTokensIfNeeded(tokenDir);
+    }
+
+    /// <summary>
+    /// Detects the old flat token layout (token files directly in tokens/) and
+    /// moves them into a tokens/default/ subdirectory for multi-account support.
+    /// </summary>
+    private static void MigrateTokensIfNeeded(string tokenDir)
+    {
+        var oldTokenFiles = Directory.GetFiles(tokenDir, "Google.Apis.Auth*");
+        if (oldTokenFiles.Length == 0) return;
+
+        var defaultDir = Path.Combine(tokenDir, "default");
+        if (Directory.Exists(defaultDir)) return;
+
+        Directory.CreateDirectory(defaultDir);
+        TrySetUnixPermissions(defaultDir);
+
+        // Move all files (not subdirectories) from tokens/ to tokens/default/
+        foreach (var file in Directory.GetFiles(tokenDir))
+        {
+            var dest = Path.Combine(defaultDir, Path.GetFileName(file));
+            File.Move(file, dest);
+        }
     }
 
     private static void TrySetUnixPermissions(string path)

@@ -10,7 +10,7 @@ public class GmailClientFactory
     private readonly AuthService _authService;
     private readonly ILogger<GmailClientFactory> _logger;
 
-    private GmailService? _cached;
+    private readonly Dictionary<string, GmailService> _cache = new();
     private readonly SemaphoreSlim _lock = new(1, 1);
 
     public GmailClientFactory(AuthService authService, ILogger<GmailClientFactory> logger)
@@ -24,23 +24,28 @@ public class GmailClientFactory
         string tokenStorePath,
         CancellationToken ct = default)
     {
-        if (_cached is not null) return _cached;
+        var cacheKey = Path.GetFullPath(tokenStorePath);
+
+        if (_cache.TryGetValue(cacheKey, out var existing))
+            return existing;
 
         await _lock.WaitAsync(ct);
         try
         {
-            if (_cached is not null) return _cached;
+            if (_cache.TryGetValue(cacheKey, out existing))
+                return existing;
 
-            _logger.LogDebug("Creating GmailService instance");
+            _logger.LogDebug("Creating GmailService for {TokenStore}", tokenStorePath);
             var credential = await _authService.GetCredentialAsync(credentialsPath, tokenStorePath, ct);
 
-            _cached = new GmailService(new BaseClientService.Initializer
+            var service = new GmailService(new BaseClientService.Initializer
             {
                 HttpClientInitializer = credential,
                 ApplicationName = "northernrange"
             });
 
-            return _cached;
+            _cache[cacheKey] = service;
+            return service;
         }
         finally
         {

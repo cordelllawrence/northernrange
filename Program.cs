@@ -113,6 +113,8 @@ try
         .ConfigureServices(services =>
         {
             services.AddSingleton<ConfigLoader>();
+            services.AddSingleton<ConfigPersister>();
+            services.AddSingleton<AccountResolver>();
             services.AddSingleton<AuthService>();
             services.AddSingleton<GmailClientFactory>();
             services.AddSingleton<MimeParser>();

@@ -11,20 +11,20 @@ public class DraftCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly SendService _sendService;
-    private readonly ConfigLoader _configLoader;
+    private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<DraftCommands> _logger;
 
     public DraftCommands(
         GmailClientFactory gmailFactory,
         SendService sendService,
-        ConfigLoader configLoader,
+        AccountResolver resolver,
         OutputWriter output,
         ILogger<DraftCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _sendService  = sendService;
-        _configLoader = configLoader;
+        _resolver     = resolver;
         _output       = output;
         _logger       = logger;
     }
@@ -34,10 +34,8 @@ public class DraftCommands
         GlobalOptions globals,
         [Option('n', Description = "Max drafts to return (1–100). Default: 25.")] int max = 25)
     {
-        var config    = _configLoader.Load(globals.Config);
-        var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode      = _output.DetermineMode(globals, config);
+        var ctx  = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         if (max is < 1 or > 100)
         {
@@ -49,7 +47,7 @@ public class DraftCommands
         try
         {
             using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "drafts.list" });
-            var gmail  = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result = await _sendService.ListDraftsAsync(gmail, max);
 
             if (mode == OutputMode.Json)
@@ -64,7 +62,7 @@ public class DraftCommands
                 return;
             }
 
-            var dateFormat = config.DateFormat;
+            var dateFormat = ctx.Config.DateFormat;
             var headers    = new[] { "Draft ID", "Date", "To", "Subject", "Snippet" };
             var rows = result.Drafts.Select(d => new[]
             {
@@ -95,10 +93,8 @@ public class DraftCommands
         GlobalOptions globals,
         [Argument(Description = "Draft ID to send. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
-        var config    = _configLoader.Load(globals.Config);
-        var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode      = _output.DetermineMode(globals, config);
+        var ctx  = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
@@ -108,7 +104,7 @@ public class DraftCommands
                 ["DraftId"] = draftId
             });
 
-            var gmail  = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result = await _sendService.SendDraftAsync(gmail, draftId);
 
             if (mode == OutputMode.Json)
@@ -137,9 +133,7 @@ public class DraftCommands
         GlobalOptions globals,
         [Argument(Description = "Draft ID to delete. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
-        var config    = _configLoader.Load(globals.Config);
-        var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
+        var ctx = _resolver.Resolve(globals);
 
         try
         {
@@ -149,7 +143,7 @@ public class DraftCommands
                 ["DraftId"] = draftId
             });
 
-            var gmail = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             await _sendService.DeleteDraftAsync(gmail, draftId);
             _output.WritePlain($"Draft {draftId} deleted.");
         }

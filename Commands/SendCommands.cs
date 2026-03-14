@@ -11,20 +11,20 @@ public class SendCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly SendService _sendService;
-    private readonly ConfigLoader _configLoader;
+    private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<SendCommands> _logger;
 
     public SendCommands(
         GmailClientFactory gmailFactory,
         SendService sendService,
-        ConfigLoader configLoader,
+        AccountResolver resolver,
         OutputWriter output,
         ILogger<SendCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _sendService  = sendService;
-        _configLoader = configLoader;
+        _resolver     = resolver;
         _output       = output;
         _logger       = logger;
     }
@@ -41,10 +41,8 @@ public class SendCommands
         [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
         [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
     {
-        var config   = _configLoader.Load(globals.Config);
-        var credPath = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx  = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         // Validate required inputs
         if (to is null || to.Count == 0)
@@ -69,7 +67,7 @@ public class SendCommands
             });
 
             var bodyText = await ResolveBodyAsync(body, bodyFile);
-            var gmail    = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result   = await _sendService.SendNewAsync(
                 gmail, to, cc, bcc, subject, bodyText, attach, draft);
 
@@ -107,10 +105,8 @@ public class SendCommands
         [Option("reply-all", Description = "CC all original recipients (To + Cc) in addition to the sender.")] bool replyAll = false,
         [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
     {
-        var config    = _configLoader.Load(globals.Config);
-        var credPath  = globals.Credentials ?? config.CredentialsPath ?? AppPaths.GetClientSecretsPath();
-        var tokenPath = AppPaths.GetTokenStorePath();
-        var mode = _output.DetermineMode(globals, config);
+        var ctx  = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         try
         {
@@ -121,7 +117,7 @@ public class SendCommands
             });
 
             var bodyText = await ResolveBodyAsync(body, bodyFile);
-            var gmail    = await _gmailFactory.GetServiceAsync(credPath, tokenPath);
+            var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
             var result   = await _sendService.SendReplyAsync(
                 gmail, messageId, bodyText, attach, replyAll, draft);
 
