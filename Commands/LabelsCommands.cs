@@ -1,12 +1,13 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
 using NorthernRange.Config;
-using NorthernRange.Errors;
+using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
+[ErrorHandlingFilter]
 public class LabelsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -35,41 +36,27 @@ public class LabelsCommands
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
-        try
-        {
-            using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "labels.list" });
-            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-            var result = await _labelService.ListAsync(gmail);
+        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "labels.list" });
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var result = await _labelService.ListAsync(gmail);
 
-            if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(result);
-                return;
-            }
-
-            var headers = new[] { "ID", "Name", "Type", "Total", "Unread" };
-            var rows = result.Labels.Select(l => new[]
-            {
-                l.Id,
-                l.Name,
-                l.Type,
-                l.MessagesTotal?.ToString() ?? "-",
-                l.MessagesUnread?.ToString() ?? "-"
-            }).ToList();
-
-            _output.WriteTable(headers, rows, mode);
-        }
-        catch (NrException ex)
+        if (mode == OutputMode.Json)
         {
-            _output.WriteError(ex.Message);
-            Environment.Exit(ex.ExitCode);
+            _output.WriteJson(result);
+            return;
         }
-        catch (Exception ex)
+
+        var headers = new[] { "ID", "Name", "Type", "Total", "Unread" };
+        var rows = result.Labels.Select(l => new[]
         {
-            _logger.LogError(ex, "labels list failed");
-            _output.WriteError($"Unexpected error: {ex.Message}");
-            Environment.Exit(ExitCodes.GeneralError);
-        }
+            l.Id,
+            l.Name,
+            l.Type,
+            l.MessagesTotal?.ToString() ?? "-",
+            l.MessagesUnread?.ToString() ?? "-"
+        }).ToList();
+
+        _output.WriteTable(headers, rows, mode);
     }
 
     [Command("info", Description = "Show details for a single label: counts and color. Accepts label ID or display name.")]
@@ -80,52 +67,38 @@ public class LabelsCommands
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
-        try
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            using var scope = _logger.BeginScope(new Dictionary<string, object>
-            {
-                ["Command"] = "labels.info",
-                ["LabelId"] = id
-            });
+            ["Command"] = "labels.info",
+            ["LabelId"] = id
+        });
 
-            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-            var label = await _labelService.GetAsync(gmail, id);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var label = await _labelService.GetAsync(gmail, id);
 
-            if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(label);
-                return;
-            }
-
-            var items = new List<(string, string)>
-            {
-                ("ID", label.Id),
-                ("Name", label.Name),
-                ("Type", label.Type),
-                ("Messages Total", label.MessagesTotal?.ToString() ?? "-"),
-                ("Messages Unread", label.MessagesUnread?.ToString() ?? "-"),
-                ("Threads Total", label.ThreadsTotal?.ToString() ?? "-"),
-                ("Threads Unread", label.ThreadsUnread?.ToString() ?? "-")
-            };
-
-            if (label.Color is not null)
-            {
-                items.Add(("Text Color", label.Color.TextColor));
-                items.Add(("Background", label.Color.BackgroundColor));
-            }
-
-            _output.WriteKeyValue(items, mode);
-        }
-        catch (NrException ex)
+        if (mode == OutputMode.Json)
         {
-            _output.WriteError(ex.Message);
-            Environment.Exit(ex.ExitCode);
+            _output.WriteJson(label);
+            return;
         }
-        catch (Exception ex)
+
+        var items = new List<(string, string)>
         {
-            _logger.LogError(ex, "labels info failed for {LabelId}", id);
-            _output.WriteError($"Unexpected error: {ex.Message}");
-            Environment.Exit(ExitCodes.GeneralError);
+            ("ID", label.Id),
+            ("Name", label.Name),
+            ("Type", label.Type),
+            ("Messages Total", label.MessagesTotal?.ToString() ?? "-"),
+            ("Messages Unread", label.MessagesUnread?.ToString() ?? "-"),
+            ("Threads Total", label.ThreadsTotal?.ToString() ?? "-"),
+            ("Threads Unread", label.ThreadsUnread?.ToString() ?? "-")
+        };
+
+        if (label.Color is not null)
+        {
+            items.Add(("Text Color", label.Color.TextColor));
+            items.Add(("Background", label.Color.BackgroundColor));
         }
+
+        _output.WriteKeyValue(items, mode);
     }
 }

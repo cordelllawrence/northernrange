@@ -2,11 +2,13 @@ using Cocona;
 using Microsoft.Extensions.Logging;
 using NorthernRange.Config;
 using NorthernRange.Errors;
+using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
+[ErrorHandlingFilter]
 public class SendCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -35,64 +37,41 @@ public class SendCommands
         [Option('t', Description = "Recipient address. Repeat for multiple. Required.")] List<string>? to = null,
         [Option('c', Description = "CC address. Repeat for multiple.")] List<string>? cc = null,
         [Option("bcc", Description = "BCC address. Repeat for multiple.")] List<string>? bcc = null,
-        [Option('s', Description = "Subject line. Required.")] string? subject = null,
+        [Option('s', Description = "Subject line. Required.")] string subject = "",
         [Option("body", Description = "Body text inline. Falls back to --body-file then stdin if omitted.")] string? body = null,
         [Option("body-file", Description = "Path to a plain-text file whose contents become the body.")] string? bodyFile = null,
         [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
         [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
     {
+        if (to is null || to.Count == 0)
+            throw new NrException(ExitCodes.InvalidArguments, "At least one --to / -t recipient is required.");
+        if (string.IsNullOrWhiteSpace(subject))
+            throw new NrException(ExitCodes.InvalidArguments, "--subject / -s is required.");
+
         var ctx  = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
-        // Validate required inputs
-        if (to is null || to.Count == 0)
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            _output.WriteError("At least one --to / -t recipient is required.");
-            Environment.Exit(ExitCodes.InvalidArguments);
+            ["Command"] = "send.new",
+            ["To"]      = string.Join(", ", to)
+        });
+
+        var bodyText = await ResolveBodyAsync(body, bodyFile);
+        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var result   = await _sendService.SendNewAsync(
+            gmail, to, cc, bcc, subject, bodyText, attach, draft);
+
+        if (mode == OutputMode.Json)
+        {
+            _output.WriteJson(result);
             return;
         }
-        if (string.IsNullOrWhiteSpace(subject))
-        {
-            _output.WriteError("--subject / -s is required.");
-            Environment.Exit(ExitCodes.InvalidArguments);
-            return;
-        }
 
-        try
-        {
-            using var scope = _logger.BeginScope(new Dictionary<string, object>
-            {
-                ["Command"] = "send.new",
-                ["To"]      = string.Join(", ", to)
-            });
-
-            var bodyText = await ResolveBodyAsync(body, bodyFile);
-            var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-            var result   = await _sendService.SendNewAsync(
-                gmail, to, cc, bcc, subject, bodyText, attach, draft);
-
-            if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(result);
-                return;
-            }
-
-            if (result.IsDraft)
-                _output.WritePlain($"Draft saved.  Draft-ID: {result.DraftId}");
-            else
-                _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
-        }
-        catch (NrException ex)
-        {
-            _output.WriteError(ex.Message);
-            Environment.Exit(ex.ExitCode);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "send new failed");
-            _output.WriteError($"Unexpected error: {ex.Message}");
-            Environment.Exit(ExitCodes.GeneralError);
-        }
+        if (result.IsDraft)
+            _output.WritePlain($"Draft saved.  Draft-ID: {result.DraftId}");
+        else
+            _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
     }
 
     [Command("reply", Description = "Reply to an existing message. Threading headers set automatically. Get IDs from 'nr messages list'.")]
@@ -108,41 +87,27 @@ public class SendCommands
         var ctx  = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
-        try
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            using var scope = _logger.BeginScope(new Dictionary<string, object>
-            {
-                ["Command"]   = "send.reply",
-                ["MessageId"] = messageId
-            });
+            ["Command"]   = "send.reply",
+            ["MessageId"] = messageId
+        });
 
-            var bodyText = await ResolveBodyAsync(body, bodyFile);
-            var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-            var result   = await _sendService.SendReplyAsync(
-                gmail, messageId, bodyText, attach, replyAll, draft);
+        var bodyText = await ResolveBodyAsync(body, bodyFile);
+        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var result   = await _sendService.SendReplyAsync(
+            gmail, messageId, bodyText, attach, replyAll, draft);
 
-            if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(result);
-                return;
-            }
-
-            if (result.IsDraft)
-                _output.WritePlain($"Draft saved.  Draft-ID: {result.DraftId}");
-            else
-                _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
-        }
-        catch (NrException ex)
+        if (mode == OutputMode.Json)
         {
-            _output.WriteError(ex.Message);
-            Environment.Exit(ex.ExitCode);
+            _output.WriteJson(result);
+            return;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "send reply failed for {MessageId}", messageId);
-            _output.WriteError($"Unexpected error: {ex.Message}");
-            Environment.Exit(ExitCodes.GeneralError);
-        }
+
+        if (result.IsDraft)
+            _output.WritePlain($"Draft saved.  Draft-ID: {result.DraftId}");
+        else
+            _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
     }
 
     // Resolves body text from --body, --body-file, or stdin (in that order).

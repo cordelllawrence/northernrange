@@ -1,12 +1,13 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
 using NorthernRange.Config;
-using NorthernRange.Errors;
+using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
+[ErrorHandlingFilter]
 public class ThreadsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -40,58 +41,38 @@ public class ThreadsCommands
         var ctx = _resolver.Resolve(globals);
         var effectiveLabel = label ?? ctx.Config.DefaultLabel;
         var effectiveMax = max ?? ctx.Config.DefaultMaxResults;
-
-        if (effectiveMax is < 1 or > 500)
-        {
-            _output.WriteError($"--max must be between 1 and 500 (got {effectiveMax}). Run 'nr threads list --help' for usage.");
-            Environment.Exit(ExitCodes.InvalidArguments);
-            return;
-        }
+        ParamValidation.RequireRange(effectiveMax, 1, 500, "max");
 
         var mode = _output.DetermineMode(globals, ctx.Config);
 
-        try
+        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "threads.list" });
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var result = await _threadService.ListAsync(gmail, effectiveLabel, query, effectiveMax, pageToken);
+
+        if (mode == OutputMode.Json)
         {
-            using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "threads.list" });
-            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-            var result = await _threadService.ListAsync(gmail, effectiveLabel, query, effectiveMax, pageToken);
-
-            if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(result);
-                return;
-            }
-
-            if (result.Threads.Count == 0)
-            {
-                _output.WritePlain("No threads found.");
-                return;
-            }
-
-            var headers = new[] { "ID", "Messages", "Snippet" };
-            var rows = result.Threads.Select(t => new[]
-            {
-                t.Id,
-                t.MessageCount?.ToString() ?? "-",
-                PlainTextRenderer.Truncate(t.Snippet, 80)
-            }).ToList();
-
-            _output.WriteTable(headers, rows, mode);
-
-            if (!string.IsNullOrEmpty(result.NextPageToken))
-                _output.WritePlain($"Next page: nr threads list --page-token {result.NextPageToken}");
+            _output.WriteJson(result);
+            return;
         }
-        catch (NrException ex)
+
+        if (result.Threads.Count == 0)
         {
-            _output.WriteError(ex.Message);
-            Environment.Exit(ex.ExitCode);
+            _output.WritePlain("No threads found.");
+            return;
         }
-        catch (Exception ex)
+
+        var headers = new[] { "ID", "Messages", "Snippet" };
+        var rows = result.Threads.Select(t => new[]
         {
-            _logger.LogError(ex, "threads list failed");
-            _output.WriteError($"Unexpected error: {ex.Message}");
-            Environment.Exit(ExitCodes.GeneralError);
-        }
+            t.Id,
+            t.MessageCount?.ToString() ?? "-",
+            PlainTextRenderer.Truncate(t.Snippet, 80)
+        }).ToList();
+
+        _output.WriteTable(headers, rows, mode);
+
+        if (!string.IsNullOrEmpty(result.NextPageToken))
+            _output.WritePlain($"Next page: nr threads list --page-token {result.NextPageToken}");
     }
 
     [Command("read", Description = "Read all messages in a thread in chronological order. Get IDs from 'nr threads list'.")]
@@ -103,52 +84,38 @@ public class ThreadsCommands
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
-        try
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            using var scope = _logger.BeginScope(new Dictionary<string, object>
+            ["Command"] = "threads.read",
+            ["ThreadId"] = id
+        });
+
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var thread = await _threadService.GetAsync(gmail, id, format);
+
+        if (mode == OutputMode.Json)
+        {
+            _output.WriteJson(thread);
+            return;
+        }
+
+        _output.WritePlain($"Thread: {thread.Id}  ({thread.Messages.Count} messages)");
+        _output.WritePlain("");
+
+        foreach (var msg in thread.Messages)
+        {
+            _output.WriteDivider($"Message {msg.Id}");
+            _output.WriteKeyValue([
+                ("From", msg.Headers.GetValueOrDefault("From", "")),
+                ("Date", msg.Headers.GetValueOrDefault("Date", ""))
+            ], mode);
+
+            if (msg.Body?.Text is not null)
             {
-                ["Command"] = "threads.read",
-                ["ThreadId"] = id
-            });
-
-            var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-            var thread = await _threadService.GetAsync(gmail, id, format);
-
-            if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(thread);
-                return;
-            }
-
-            _output.WritePlain($"Thread: {thread.Id}  ({thread.Messages.Count} messages)");
-            _output.WritePlain("");
-
-            foreach (var msg in thread.Messages)
-            {
-                _output.WriteDivider($"Message {msg.Id}");
-                _output.WriteKeyValue([
-                    ("From", msg.Headers.GetValueOrDefault("From", "")),
-                    ("Date", msg.Headers.GetValueOrDefault("Date", ""))
-                ], mode);
-
-                if (msg.Body?.Text is not null)
-                {
-                    _output.WritePlain("");
-                    _output.WritePlain(msg.Body.Text);
-                }
                 _output.WritePlain("");
+                _output.WritePlain(msg.Body.Text);
             }
-        }
-        catch (NrException ex)
-        {
-            _output.WriteError(ex.Message);
-            Environment.Exit(ex.ExitCode);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "threads read failed for {ThreadId}", id);
-            _output.WriteError($"Unexpected error: {ex.Message}");
-            Environment.Exit(ExitCodes.GeneralError);
+            _output.WritePlain("");
         }
     }
 }
