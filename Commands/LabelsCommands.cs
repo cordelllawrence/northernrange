@@ -1,6 +1,7 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
 using NorthernRange.Config;
+using NorthernRange.Errors;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
@@ -100,5 +101,63 @@ public class LabelsCommands
         }
 
         _output.WriteKeyValue(items, mode);
+    }
+
+    [Command("create", Description = "Create a new user label. Optionally set text and background colors (hex, e.g. '#000000').")]
+    public async Task CreateAsync(
+        GlobalOptions globals,
+        [Argument(Description = "Display name for the new label.")] string name,
+        [Option("text-color", Description = "Text color hex (e.g. '#ffffff'). Requires --bg-color.")] string? textColor = null,
+        [Option("bg-color", Description = "Background color hex (e.g. '#4986e7'). Requires --text-color.")] string? bgColor = null)
+    {
+        if ((textColor is null) != (bgColor is null))
+            throw new NrException(ExitCodes.InvalidArguments,
+                "Both --text-color and --bg-color must be provided together, or neither.");
+
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Command"] = "labels.create",
+            ["LabelName"] = name
+        });
+
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var label = await _labelService.CreateAsync(gmail, name, textColor, bgColor);
+
+        if (mode == OutputMode.Json)
+        {
+            _output.WriteJson(label);
+            return;
+        }
+
+        _output.WritePlain($"Created label '{label.Name}'  ID: {label.Id}");
+    }
+
+    [Command("delete", Description = "Delete a user label. Messages with this label are NOT deleted, only the label is removed.")]
+    public async Task DeleteAsync(
+        GlobalOptions globals,
+        [Argument(Description = "Label ID or display name. Get IDs from 'nr labels list'.")] string id)
+    {
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Command"] = "labels.delete",
+            ["LabelId"] = id
+        });
+
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        await _labelService.DeleteAsync(gmail, id);
+
+        if (mode == OutputMode.Json)
+        {
+            _output.WriteJson(new { deleted = true, id });
+            return;
+        }
+
+        _output.WritePlain($"Deleted label '{id}'.");
     }
 }

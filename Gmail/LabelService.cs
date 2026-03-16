@@ -80,6 +80,62 @@ public class LabelService
         };
     }
 
+    public async Task<LabelDetail> CreateAsync(
+        GmailService gmail, string name,
+        string? textColor, string? backgroundColor,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("Creating label {LabelName}", name);
+
+        var body = new Google.Apis.Gmail.v1.Data.Label
+        {
+            Name = name,
+            LabelListVisibility = "labelShow",
+            MessageListVisibility = "show"
+        };
+
+        if (textColor is not null && backgroundColor is not null)
+        {
+            body.Color = new Google.Apis.Gmail.v1.Data.LabelColor
+            {
+                TextColor = textColor,
+                BackgroundColor = backgroundColor
+            };
+        }
+
+        Google.Apis.Gmail.v1.Data.Label created;
+        try
+        {
+            created = await gmail.Users.Labels.Create(body, "me").ExecuteAsync(ct);
+        }
+        catch (Google.GoogleApiException ex)
+        {
+            throw MapApiException(ex);
+        }
+
+        return MapLabel(created);
+    }
+
+    public async Task DeleteAsync(
+        GmailService gmail, string idOrName,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("Deleting label {LabelIdOrName}", idOrName);
+
+        var resolvedId = idOrName;
+        if (!IsLikelyLabelId(idOrName))
+            resolvedId = await ResolveNameToIdAsync(gmail, idOrName, ct);
+
+        try
+        {
+            await gmail.Users.Labels.Delete("me", resolvedId).ExecuteAsync(ct);
+        }
+        catch (Google.GoogleApiException ex)
+        {
+            throw MapApiException(ex);
+        }
+    }
+
     private static bool IsLikelyLabelId(string value) =>
         value.StartsWith("Label_", StringComparison.Ordinal)
         || value == value.ToUpperInvariant(); // System labels are all-caps
