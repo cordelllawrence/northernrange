@@ -1,6 +1,7 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
 using NorthernRange.Config;
+using NorthernRange.Errors;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
@@ -12,6 +13,7 @@ public class MessagesCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly MessageService _messageService;
+    private readonly LabelService _labelService;
     private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<MessagesCommands> _logger;
@@ -19,12 +21,14 @@ public class MessagesCommands
     public MessagesCommands(
         GmailClientFactory gmailFactory,
         MessageService messageService,
+        LabelService labelService,
         AccountResolver resolver,
         OutputWriter output,
         ILogger<MessagesCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _messageService = messageService;
+        _labelService = labelService;
         _resolver = resolver;
         _output = output;
         _logger = logger;
@@ -48,7 +52,10 @@ public class MessagesCommands
 
         using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "messages.list" });
         var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-        var result = await _messageService.ListAsync(gmail, effectiveLabel, query, effectiveMax, pageToken, format);
+
+        // Resolve label name to ID (e.g. "Inbox" → "INBOX")
+        var resolvedLabel = (await _labelService.GetAsync(gmail, effectiveLabel)).Id;
+        var result = await _messageService.ListAsync(gmail, resolvedLabel, query, effectiveMax, pageToken, format);
 
         if (mode == OutputMode.Json)
         {
@@ -76,6 +83,63 @@ public class MessagesCommands
 
         if (!string.IsNullOrEmpty(result.NextPageToken))
             _output.WritePlain($"Next page: nr messages list --page-token {result.NextPageToken}");
+    }
+
+    [Command("label", Description = "Add or remove labels on a message. Accepts label IDs or display names.")]
+    public async Task LabelAsync(
+        GlobalOptions globals,
+        [Argument(Description = "Gmail message ID. Get from 'nr messages list'.")] string id,
+        [Option("add", new[] { 'a' }, Description = "Label ID or name to add. Repeat for multiple.")] List<string>? add = null,
+        [Option("remove", new[] { 'r' }, Description = "Label ID or name to remove. Repeat for multiple.")] List<string>? remove = null)
+    {
+        if ((add is null or { Count: 0 }) && (remove is null or { Count: 0 }))
+            throw new NrException(ExitCodes.InvalidArguments,
+                "Provide at least one --add or --remove label.");
+
+        var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Command"] = "messages.label",
+            ["MessageId"] = id
+        });
+
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+
+        // Resolve label names to IDs
+        var addIds = await ResolveLabelIdsAsync(gmail, add);
+        var removeIds = await ResolveLabelIdsAsync(gmail, remove);
+
+        var result = await _messageService.ModifyLabelsAsync(gmail, id, addIds, removeIds);
+
+        if (mode == OutputMode.Json)
+        {
+            _output.WriteJson(result);
+            return;
+        }
+
+        var parts = new List<string>();
+        if (addIds is { Count: > 0 })
+            parts.Add($"added {string.Join(", ", add!)}");
+        if (removeIds is { Count: > 0 })
+            parts.Add($"removed {string.Join(", ", remove!)}");
+
+        _output.WritePlain($"Message {id}: {string.Join("; ", parts)}.");
+    }
+
+    private async Task<List<string>?> ResolveLabelIdsAsync(Google.Apis.Gmail.v1.GmailService gmail, List<string>? labels)
+    {
+        if (labels is null or { Count: 0 })
+            return null;
+
+        var ids = new List<string>(labels.Count);
+        foreach (var label in labels)
+        {
+            var resolved = await _labelService.GetAsync(gmail, label);
+            ids.Add(resolved.Id);
+        }
+        return ids;
     }
 
     [Command("read", Description = "Read a single message by ID. Decodes body and lists attachments. Get IDs from 'nr messages list'.")]

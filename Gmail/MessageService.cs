@@ -54,7 +54,7 @@ public class MessageService
         if (format == "minimal")
         {
             var minimal = listResp.Messages
-                .Select(m => new MessageSummary(m.Id, m.ThreadId, null, null, null, null, null))
+                .Select(m => new MessageSummary(m.Id, m.ThreadId, null, null, null, null, null, m.LabelIds?.ToList() ?? []))
                 .ToList();
             return new MessageListResult(minimal, listResp.NextPageToken, listResp.ResultSizeEstimate ?? 0);
         }
@@ -89,7 +89,8 @@ public class MessageService
             headers.GetValueOrDefault("To"),
             headers.GetValueOrDefault("Subject"),
             date,
-            msg.Snippet);
+            msg.Snippet,
+            msg.LabelIds?.ToList() ?? []);
     }
 
     public async Task<MessageDetail> GetAsync(
@@ -163,6 +164,39 @@ public class MessageService
             attachments,
             MimeParser.ParseInternalDate(msg.InternalDate),
             msg.SizeEstimate ?? 0);
+    }
+
+    public async Task<ModifyMessageResult> ModifyLabelsAsync(
+        GmailService gmail,
+        string messageId,
+        IList<string>? addLabelIds,
+        IList<string>? removeLabelIds,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("Modifying labels on message {MessageId}. Add={Add}, Remove={Remove}",
+            messageId, addLabelIds, removeLabelIds);
+
+        var body = new Google.Apis.Gmail.v1.Data.ModifyMessageRequest
+        {
+            AddLabelIds = addLabelIds,
+            RemoveLabelIds = removeLabelIds
+        };
+
+        Google.Apis.Gmail.v1.Data.Message msg;
+        try
+        {
+            msg = await gmail.Users.Messages.Modify(body, "me", messageId).ExecuteAsync(ct);
+        }
+        catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            throw new NrException(ExitCodes.NotFound, $"Message '{messageId}' not found.");
+        }
+        catch (Google.GoogleApiException ex)
+        {
+            throw MapApiException(ex);
+        }
+
+        return new ModifyMessageResult(msg.Id, msg.LabelIds?.ToList() ?? []);
     }
 
     private static NrException MapApiException(Google.GoogleApiException ex) =>

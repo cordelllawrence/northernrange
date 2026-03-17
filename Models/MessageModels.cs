@@ -12,7 +12,8 @@ public record MessageSummary(
     string? To,
     string? Subject,
     DateTimeOffset? Date,
-    string? Snippet);
+    string? Snippet,
+    List<string> LabelIds);
 
 public record MessageDetail(
     string Id,
@@ -28,3 +29,7 @@ public record MessageDetail(
 public record MessageBody(
     string MimeType,
     string? Text);
+
+public record ModifyMessageResult(
+    string Id,
+    List<string> LabelIds);
