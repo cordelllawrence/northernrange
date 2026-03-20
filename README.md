@@ -11,7 +11,7 @@ A focused, read-only Gmail command-line interface built for programmatic use.
 Most Gmail tools are built around interactive UIs. `nr` is built around the opposite philosophy:
 
 - **Headless-first.** `--json` output is a stable contract. Agents and scripts can depend on it.
-- **Safe by default.** Destructive operations (delete, label changes) are not supported. Sending and drafts are opt-in commands with clear intent.
+- **Safe by default.** Sending, drafts, and label management are opt-in commands with clear intent.
 - **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token and log files.
 - **Composable.** List commands produce paginated JSON with `nextPageToken`. Output is pipe-friendly.
 - **Self-contained binary.** A single executable with no .NET runtime installation required on the target machine.
@@ -142,8 +142,9 @@ Token expires:  2026-03-03 01:12:00Z (valid)
 ## Messages Commands
 
 ```
-nr messages list  [--label <id>] [--query <q>] [--max <n>] [--page-token <token>] [--format minimal|metadata]
-nr messages read  <id>  [--format full|raw|metadata] [--include-headers <names>]
+nr messages list   [--label <id>] [--query <q>] [--max <n>] [--page-token <token>] [--format minimal|metadata]
+nr messages read   <id>  [--format full|raw|metadata] [--include-headers <names>]
+nr messages label  <id>  [--add <label>]... [--remove <label>]...
 ```
 
 #### `messages list`
@@ -223,6 +224,26 @@ nr messages read 19cb08f9253d9482 --format raw > message.eml
 nr messages read 19cb08f9253d9482 --json
 ```
 
+#### `messages label`
+
+Add or remove labels on a message. Accepts label IDs or display names. At least one `--add` or `--remove` is required.
+
+| Flag | Short | Description |
+|---|---|---|
+| `--add <label>` | `-a` | Label to add. Repeat for multiple. |
+| `--remove <label>` | `-r` | Label to remove. Repeat for multiple. |
+
+```bash
+# Add a label
+nr messages label 19cb08f9253d9482 --add "Work/Projects"
+
+# Remove from inbox and add to a custom label
+nr messages label 19cb08f9253d9482 --add "Archive" --remove INBOX
+
+# Multiple labels
+nr messages label 19cb08f9253d9482 -a "Urgent" -a "Needs Review"
+```
+
 ---
 
 ## Threads Commands
@@ -254,7 +275,9 @@ nr threads read 19cb04f07919b8a7 --json
 
 ```
 nr labels list
-nr labels info  <id-or-name>
+nr labels info    <id-or-name>
+nr labels create  <name>  [--text-color <hex>] [--bg-color <hex>]
+nr labels delete  <id-or-name>
 ```
 
 #### `labels list`
@@ -284,6 +307,29 @@ Messages Total:   27668
 Messages Unread:  21642
 Threads Total:    23445
 Threads Unread:   19272
+```
+
+#### `labels create`
+
+Creates a new user label. Optionally set text and background colors — both must be provided together or neither.
+
+| Flag | Description |
+|---|---|
+| `--text-color <hex>` | Text color (e.g. `#ffffff`). Requires `--bg-color`. |
+| `--bg-color <hex>` | Background color (e.g. `#4986e7`). Requires `--text-color`. |
+
+```bash
+nr labels create "Work/Projects"
+nr labels create "Urgent" --text-color "#ffffff" --bg-color "#cc3a21"
+```
+
+#### `labels delete`
+
+Deletes a user label. Messages with this label are not deleted — only the label is removed. Accepts a label ID or display name.
+
+```bash
+nr labels delete "Work/Projects"
+nr labels delete Label_18
 ```
 
 ---
@@ -523,9 +569,9 @@ Logs roll daily and are retained for 7 days. No email content is ever written to
 
 ## Roadmap
 
-Sending and drafts are now supported. Planned additions:
+Sending, drafts, and label management are now supported. Planned additions:
 
-- Label management (create, rename, delete)
+- Label rename
 - Marking messages read / unread
 - Moving and archiving messages
 - Forwarding messages

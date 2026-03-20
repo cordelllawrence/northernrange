@@ -122,6 +122,21 @@ nr messages read <id> --format raw > message.eml
 | `--format` | `full` (default): decoded body and attachments. `metadata`: headers only, no body. `raw`: original RFC 2822 bytes written to stdout. |
 | `--include-headers` | Comma-separated headers to include with `--format metadata`. Default: `From,To,Cc,Subject,Date,Message-ID`. Header names are case-insensitive. |
 
+### `nr messages label <id>`
+
+Add or remove labels on a message. Accepts label IDs or display names. At least one `--add` or `--remove` is required.
+
+```
+nr messages label 19cb08f9253d9482 --add "Work/Projects"
+nr messages label <id> --add "Urgent" --remove INBOX
+nr messages label <id> -a "Needs Review" -a "Urgent" --json
+```
+
+| Option | Description |
+|---|---|
+| `-a` / `--add` | Label ID or name to add. Repeat for multiple. |
+| `-r` / `--remove` | Label ID or name to remove. Repeat for multiple. |
+
 ---
 
 ## threads
@@ -178,6 +193,31 @@ Show details for a single label: message counts, thread counts, unread counts, a
 nr labels info INBOX
 nr labels info "Financial Updates"
 nr labels info Label_18 --json
+```
+
+### `nr labels create <name>`
+
+Create a new user label. Optionally set text and background colors — both must be provided together or neither.
+
+```
+nr labels create "Work/Projects"
+nr labels create "Urgent" --text-color "#ffffff" --bg-color "#cc3a21"
+nr labels create "Invoices" --json
+```
+
+| Option | Description |
+|---|---|
+| `--text-color <hex>` | Text color (e.g. `#ffffff`). Requires `--bg-color`. |
+| `--bg-color <hex>` | Background color (e.g. `#4986e7`). Requires `--text-color`. |
+
+### `nr labels delete <id>`
+
+Delete a user label. Messages with this label are not deleted — only the label is removed. Accepts a label ID or display name.
+
+```
+nr labels delete "Work/Projects"
+nr labels delete Label_18
+nr labels delete "Old Label" --json
 ```
 
 ---
