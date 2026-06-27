@@ -304,11 +304,13 @@ List saved drafts sorted newest-first. Shows Draft ID, date, recipient, and subj
 nr drafts list
 nr drafts list -n 10
 nr drafts list --json
+nr drafts list --page-token <token-from-previous-output>
 ```
 
 | Option | Description |
 |---|---|
 | `-n` / `--max` | Max drafts to return (1–100). Default: 25. |
+| `--page-token` | Pagination token from a previous list response. |
 
 ### `nr drafts send <draft-id>`
 

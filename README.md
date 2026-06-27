@@ -587,7 +587,6 @@ messages read/unread, archiving, and moving are already achievable today via
 - Label rename
 - A dedicated `messages archive` / `mark` convenience wrapper over `messages label`
 - Forwarding messages
-- Pagination for `drafts list`
 
 ---
 

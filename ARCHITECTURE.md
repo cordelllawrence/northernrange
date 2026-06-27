@@ -190,15 +190,36 @@ Env vars: `NR_ACCOUNT`, `NR_CREDENTIALS`, `NR_CONFIG`, `NR_DEFAULT_LABEL`,
 
 ---
 
-## 10. Known gaps / tech debt
+## 10. Tests
 
-These are tracked in detail in `CODE-REVIEW.md`. In brief:
+`tests/northernrange.Tests` (xUnit) covers the pure, API-independent logic — the
+areas most prone to silent bugs:
 
-- `threads list` does not resolve label *names* to IDs (only `messages list` does).
-- No 429/503 retry/backoff despite the spec calling for exponential backoff.
-- `messages read --format raw` round-trips bytes through a UTF-8 string.
-- `MapApiException` is duplicated across services and diverges slightly.
-- A few dead members: `OutputWriter.WriteError`, `AppPaths.GetUserInfoPath`,
-  and `config.httpTimeoutSeconds` (read but never applied).
-- `drafts delete` skips the `--json` contract; `drafts list` exposes no paging.
+- **MimeParser** — base64url decoding (padding + url-safe alphabet), header
+  parsing, internal-date conversion, body extraction (plain/HTML/nested
+  multipart), attachment enumeration.
+- **PlainTextRenderer** — CJK/emoji/combining display widths, truncation,
+  size/date formatting, table alignment.
+- **GmailErrorMapper** — status-code → exit-code mapping.
+- **SendService.BuildReplyFields** — Re: prefixing, reply-all CC, References chain.
+- **Llm doc/schema generators**, **ConfigLoader/AccountResolver/ConfigPersister**
+  precedence, and **ParamValidation**.
+
+Run with `dotnet test`. The Gmail services themselves take a concrete
+`GmailService` (no interface), so command/service flows are validated by manual
+smoke tests rather than mocked unit tests.
+
+## 11. Resolved review items & remaining gaps
+
+The findings in `CODE-REVIEW.md` have been **addressed**: the class-level
+`ErrorHandlingFilter` (which Cocona silently ignored for nested commands, so all
+errors exited 1 with a stack trace) is now applied per-method; `threads list`
+resolves label names; `messages read --format raw` is binary-safe; the API error
+mapper is centralized; `httpTimeoutSeconds` and exponential backoff are wired in;
+dead members were removed; and `drafts delete`/`drafts list` gained `--json` and
+pagination.
+
+Remaining, by design or deferred: 429 responses are not specially retried (only
+503 + transient exceptions); Spectre `--ui` is best-effort; permanent mail
+deletion is intentionally unsupported.
 </invoke>

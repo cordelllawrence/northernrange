@@ -5,8 +5,26 @@
 Findings below are improvements, not blockers. Severity is relative to a
 pre-1.0 agent-facing CLI where the `--json` contract and exit codes matter most.
 
-Each finding lists `file:line` and a concrete recommendation. Nothing here has
-been changed — this is a report. Ask to have any subset applied.
+Each finding lists `file:line` and a concrete recommendation.
+
+> **Status: RESOLVED.** All findings below were applied (commit "Apply
+> code-review fixes; restore exit-code contract"), and an xUnit suite was added.
+> Line numbers refer to the pre-fix code. See the "Resolution" note on each item.
+
+---
+
+## C0 — ErrorHandlingFilter never fired (critical; found while fixing). RESOLVED.
+
+Discovered via smoke testing, not the static pass: `[ErrorHandlingFilter]` was
+applied at the **class** level, but Cocona does **not** propagate class-level
+filters to the methods of nested `[HasSubCommands]` classes. So the filter never
+ran — every `NrException` (validation, auth, API, not-found) escaped as an
+**unhandled exception with a stack trace and exit code 1**, defeating both the
+centralized error handling and the entire documented exit-code contract (the core
+"agent-first" promise). Global DI registration of `ICommandFilter` did not work in
+this Cocona version either. *Fix:* moved `[ErrorHandlingFilter]` to every command
+method (verified: validation now exits 2 with a clean one-line message). This was
+the single highest-impact fix in the pass.
 
 ---
 
@@ -161,12 +179,18 @@ contract; wrap the input assignment defensively.
 
 ---
 
-## Suggested order of attack
+## Resolution
 
-1. **Quick wins / low risk:** M1 (centralize mapper — also fixes C3), D1, D2, D3,
-   M2, L2.
-2. **Correctness:** C1, C2, then C4.
-3. **Resilience:** R1 (+ R2), R3.
+All items applied and verified by a clean build (0 warnings) plus an 87-test
+xUnit suite:
 
-A single PR for group 1 would remove the most code and the most inconsistency for
-the least risk.
+- **Correctness:** C0 (filter), C1 (thread label resolution), C2 (binary-safe
+  raw), C3 (attachment 401 mapping), C4 (all-caps label delete).
+- **Consistency/DRY:** M1 (`GmailErrorMapper`), M2 (`drafts delete --json`),
+  L1 (`drafts list` paging), L2 (`auth status` exit via pipeline).
+- **Dead/inert:** D1, D2 removed; D3 (`httpTimeoutSeconds`) now applied.
+- **Resilience:** R1 (503 + exception backoff), R2 (bounded list concurrency),
+  R3 (guarded console encoding).
+
+Note R1 covers 503 + transient exceptions; 429 is not specially retried in this
+Google.Apis version (no 429 backoff-policy flag). Tracked as a future item.
