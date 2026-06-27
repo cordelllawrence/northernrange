@@ -7,7 +7,6 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class DraftCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -30,10 +29,12 @@ public class DraftCommands
         _logger       = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("list", Description = "List saved drafts sorted newest-first. Use --json to get draft IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('n', Description = "Max drafts to return (1–100). Default: 25.")] int max = 25)
+        [Option('n', Description = "Max drafts to return (1–100). Default: 25.")] int max = 25,
+        [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null)
     {
         ParamValidation.RequireRange(max, 1, 100, "max");
 
@@ -41,8 +42,8 @@ public class DraftCommands
         var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "drafts.list" });
-        var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-        var result = await _sendService.ListDraftsAsync(gmail, max);
+        var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var result = await _sendService.ListDraftsAsync(gmail, max, pageToken);
 
         if (mode == OutputMode.Json)
         {
@@ -68,8 +69,12 @@ public class DraftCommands
         }).ToList();
 
         _output.WriteTable(headers, rows, mode);
+
+        if (!string.IsNullOrEmpty(result.NextPageToken))
+            _output.WritePlain($"Next page: nr drafts list --page-token {result.NextPageToken}");
     }
 
+    [ErrorHandlingFilter]
     [Command("send", Description = "Send an existing draft immediately. Get draft IDs from 'nr drafts list --json'.")]
     public async Task SendAsync(
         GlobalOptions globals,
@@ -84,7 +89,7 @@ public class DraftCommands
             ["DraftId"] = draftId
         });
 
-        var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var result = await _sendService.SendDraftAsync(gmail, draftId);
 
         if (mode == OutputMode.Json)
@@ -96,12 +101,14 @@ public class DraftCommands
         _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
     }
 
+    [ErrorHandlingFilter]
     [Command("delete", Description = "Permanently delete a draft. Cannot be undone. Get draft IDs from 'nr drafts list --json'.")]
     public async Task DeleteAsync(
         GlobalOptions globals,
         [Argument(Description = "Draft ID to delete. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
         var ctx = _resolver.Resolve(globals);
+        var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
@@ -109,8 +116,15 @@ public class DraftCommands
             ["DraftId"] = draftId
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         await _sendService.DeleteDraftAsync(gmail, draftId);
+
+        if (mode == OutputMode.Json)
+        {
+            _output.WriteJson(new { deleted = true, draftId });
+            return;
+        }
+
         _output.WritePlain($"Draft {draftId} deleted.");
     }
 }

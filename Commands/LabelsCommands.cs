@@ -8,7 +8,6 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class LabelsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -31,6 +30,7 @@ public class LabelsCommands
         _logger = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("list", Description = "List all labels (system and user-created). Use IDs with 'nr messages list --label'.")]
     public async Task ListAsync(GlobalOptions globals)
     {
@@ -38,7 +38,7 @@ public class LabelsCommands
         var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "labels.list" });
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var result = await _labelService.ListAsync(gmail);
 
         if (mode == OutputMode.Json)
@@ -60,6 +60,7 @@ public class LabelsCommands
         _output.WriteTable(headers, rows, mode);
     }
 
+    [ErrorHandlingFilter]
     [Command("info", Description = "Show details for a single label: counts and color. Accepts label ID or display name.")]
     public async Task InfoAsync(
         GlobalOptions globals,
@@ -74,7 +75,7 @@ public class LabelsCommands
             ["LabelId"] = id
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var label = await _labelService.GetAsync(gmail, id);
 
         if (mode == OutputMode.Json)
@@ -103,6 +104,7 @@ public class LabelsCommands
         _output.WriteKeyValue(items, mode);
     }
 
+    [ErrorHandlingFilter]
     [Command("create", Description = "Create a new user label. Optionally set text and background colors (hex, e.g. '#000000').")]
     public async Task CreateAsync(
         GlobalOptions globals,
@@ -123,7 +125,7 @@ public class LabelsCommands
             ["LabelName"] = name
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var label = await _labelService.CreateAsync(gmail, name, textColor, bgColor);
 
         if (mode == OutputMode.Json)
@@ -135,6 +137,7 @@ public class LabelsCommands
         _output.WritePlain($"Created label '{label.Name}'  ID: {label.Id}");
     }
 
+    [ErrorHandlingFilter]
     [Command("delete", Description = "Delete a user label. Messages with this label are NOT deleted, only the label is removed.")]
     public async Task DeleteAsync(
         GlobalOptions globals,
@@ -149,7 +152,7 @@ public class LabelsCommands
             ["LabelId"] = id
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         await _labelService.DeleteAsync(gmail, id);
 
         if (mode == OutputMode.Json)

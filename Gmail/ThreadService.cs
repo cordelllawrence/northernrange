@@ -8,6 +8,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail <c>users.threads</c> operations: list threads and read a thread's
+/// messages in chronological order. Mirrors <see cref="MessageService"/> for the
+/// thread resource family.
+/// </summary>
 public class ThreadService
 {
     private readonly MimeParser _mimeParser;
@@ -42,7 +47,7 @@ public class ThreadService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         if (resp.Threads is null || resp.Threads.Count == 0)
@@ -86,7 +91,7 @@ public class ThreadService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         var messages = (thread.Messages ?? [])
@@ -123,15 +128,4 @@ public class ThreadService
             MimeParser.ParseInternalDate(msg.InternalDate),
             msg.SizeEstimate ?? 0);
     }
-
-    private static NrException MapApiException(Google.GoogleApiException ex) =>
-        ex.HttpStatusCode switch
-        {
-            System.Net.HttpStatusCode.NotFound =>
-                new NrException(ExitCodes.NotFound, $"Resource not found: {ex.Error?.Message ?? ex.Message}"),
-            System.Net.HttpStatusCode.Unauthorized =>
-                new NrException(ExitCodes.AuthRequired, "Authentication expired. Run 'nr auth login'."),
-            _ =>
-                new NrException(ExitCodes.ApiError, $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}")
-        };
 }

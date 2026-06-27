@@ -5,6 +5,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail <c>users.labels</c> operations: list, get, create, and delete. Accepts
+/// either a label ID or a display name; names are resolved to IDs via
+/// <see cref="ResolveNameToIdAsync"/> (ambiguous names are rejected).
+/// </summary>
 public class LabelService
 {
     private readonly ILogger<LabelService> _logger;
@@ -25,7 +30,7 @@ public class LabelService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         var labels = (resp.Labels ?? []).Select(MapLabel).ToList();
@@ -58,7 +63,7 @@ public class LabelService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         return MapLabel(label);
@@ -110,7 +115,7 @@ public class LabelService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         return MapLabel(created);
@@ -131,8 +136,23 @@ public class LabelService
             await gmail.Users.Labels.Delete("me", resolvedId).ExecuteAsync(ct);
         }
         catch (Google.GoogleApiException ex)
+            when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound && resolvedId == idOrName)
         {
-            throw MapApiException(ex);
+            // Input looked like an ID (e.g. an all-caps user label such as "URGENT")
+            // but no such ID exists — fall back to resolving it as a display name.
+            resolvedId = await ResolveNameToIdAsync(gmail, idOrName, ct);
+            try
+            {
+                await gmail.Users.Labels.Delete("me", resolvedId).ExecuteAsync(ct);
+            }
+            catch (Google.GoogleApiException inner)
+            {
+                throw GmailErrorMapper.Map(inner, $"Label '{idOrName}' not found.");
+            }
+        }
+        catch (Google.GoogleApiException ex)
+        {
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -156,15 +176,4 @@ public class LabelService
             l.ThreadsUnread,
             color);
     }
-
-    private static NrException MapApiException(Google.GoogleApiException ex) =>
-        ex.HttpStatusCode switch
-        {
-            System.Net.HttpStatusCode.NotFound =>
-                new NrException(ExitCodes.NotFound, $"Label not found: {ex.Error?.Message ?? ex.Message}"),
-            System.Net.HttpStatusCode.Unauthorized =>
-                new NrException(ExitCodes.AuthRequired, "Authentication expired. Run 'nr auth login'."),
-            _ =>
-                new NrException(ExitCodes.ApiError, $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}")
-        };
 }

@@ -8,6 +8,12 @@ using NrMimeParser = NorthernRange.Mime.MimeParser;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Composes and sends mail and manages drafts. Builds RFC 2822 messages with
+/// MimeKit (base64url-encoded into <c>Message.Raw</c>), sets reply threading
+/// headers (<c>In-Reply-To</c>/<c>References</c>), and wraps
+/// <c>users.messages.send</c> and <c>users.drafts</c>.
+/// </summary>
 public class SendService
 {
     private readonly ILogger<SendService> _logger;
@@ -60,7 +66,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -90,40 +96,12 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         var headers = NrMimeParser.ParseHeaders(original.Payload?.Headers);
-        headers.TryGetValue("Subject",    out var origSubject);
-        headers.TryGetValue("From",       out var origFrom);
-        headers.TryGetValue("To",         out var origTo);
-        headers.TryGetValue("Cc",         out var origCc);
         headers.TryGetValue("Message-ID", out var origMessageId);
-        headers.TryGetValue("References", out var origReferences);
-
-        var replySubject = origSubject?.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) == true
-            ? origSubject
-            : $"Re: {origSubject}";
-
-        // Reply-to is always the original sender
-        var to = new List<string>();
-        if (!string.IsNullOrWhiteSpace(origFrom)) to.Add(origFrom);
-
-        // --reply-all CCs all original recipients
-        List<string>? cc = null;
-        if (replyAll)
-        {
-            cc = [];
-            if (!string.IsNullOrWhiteSpace(origTo))
-                cc.AddRange(origTo.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
-            if (!string.IsNullOrWhiteSpace(origCc))
-                cc.AddRange(origCc.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
-        }
-
-        // Build References chain
-        var references = string.IsNullOrWhiteSpace(origReferences)
-            ? origMessageId
-            : $"{origReferences} {origMessageId}";
+        var (to, cc, replySubject, references) = BuildReplyFields(headers, replyAll);
 
         var rawMsg = await BuildRawMessageAsync(
             to, cc, null, replySubject, body, attachmentPaths,
@@ -156,7 +134,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -165,6 +143,7 @@ public class SendService
     public async Task<DraftListResult> ListDraftsAsync(
         GmailService gmail,
         int maxResults,
+        string? pageToken = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("ListDrafts. Max={Max}", maxResults);
@@ -174,11 +153,12 @@ public class SendService
         {
             var listReq = gmail.Users.Drafts.List("me");
             listReq.MaxResults = maxResults;
+            listReq.PageToken = pageToken;
             listResp = await listReq.ExecuteAsync(ct);
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         if (listResp.Drafts is null || listResp.Drafts.Count == 0)
@@ -248,7 +228,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -265,8 +245,54 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
+    }
+
+    // ── Reply field computation (pure; unit-tested) ──────────────────────────
+
+    /// <summary>
+    /// Derives reply recipients, subject, and the References chain from the
+    /// original message's headers. The reply goes to the original sender; with
+    /// <paramref name="replyAll"/>, the original To + Cc become the new Cc. The
+    /// subject gains a single "Re: " prefix (not stacked), and the new
+    /// Message-ID is appended to any existing References chain.
+    /// </summary>
+    internal static (List<string> To, List<string>? Cc, string Subject, string? References) BuildReplyFields(
+        IReadOnlyDictionary<string, string> headers, bool replyAll)
+    {
+        headers.TryGetValue("Subject", out var origSubject);
+        headers.TryGetValue("From", out var origFrom);
+        headers.TryGetValue("To", out var origTo);
+        headers.TryGetValue("Cc", out var origCc);
+        headers.TryGetValue("Message-ID", out var origMessageId);
+        headers.TryGetValue("References", out var origReferences);
+
+        var replySubject = origSubject?.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) == true
+            ? origSubject
+            : $"Re: {origSubject}";
+
+        // Reply-to is always the original sender.
+        var to = new List<string>();
+        if (!string.IsNullOrWhiteSpace(origFrom)) to.Add(origFrom);
+
+        // --reply-all CCs all original recipients (original To + Cc).
+        List<string>? cc = null;
+        if (replyAll)
+        {
+            cc = [];
+            if (!string.IsNullOrWhiteSpace(origTo))
+                cc.AddRange(origTo.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
+            if (!string.IsNullOrWhiteSpace(origCc))
+                cc.AddRange(origCc.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
+        }
+
+        // Append the original Message-ID to the References chain.
+        var references = string.IsNullOrWhiteSpace(origReferences)
+            ? origMessageId
+            : $"{origReferences} {origMessageId}";
+
+        return (to, cc, replySubject, references);
     }
 
     // ── MIME builder ─────────────────────────────────────────────────────────
@@ -315,21 +341,4 @@ public class SendService
 
         return new Message { Raw = raw };
     }
-
-    // ── Error mapping ─────────────────────────────────────────────────────────
-
-    private static NrException MapApiException(Google.GoogleApiException ex) =>
-        ex.HttpStatusCode switch
-        {
-            System.Net.HttpStatusCode.Unauthorized =>
-                new NrException(ExitCodes.AuthRequired, "Authentication expired. Run 'nr auth login'."),
-            System.Net.HttpStatusCode.Forbidden =>
-                new NrException(ExitCodes.ApiError,
-                    "Insufficient permissions — run 'nr auth login' to grant send/modify access."),
-            System.Net.HttpStatusCode.NotFound =>
-                new NrException(ExitCodes.NotFound, $"Resource not found: {ex.Error?.Message ?? ex.Message}"),
-            _ =>
-                new NrException(ExitCodes.ApiError,
-                    $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}")
-        };
 }

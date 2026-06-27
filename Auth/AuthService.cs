@@ -11,6 +11,12 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Auth;
 
+/// <summary>
+/// OAuth2 lifecycle for a single account's token store: browser/headless login,
+/// remote-revoke + local-delete logout, network-free status, and silent
+/// credential refresh for API calls. The signed-in email is cached in
+/// <c>user_info.json</c> so status can be reported offline. Scope: <c>gmail.modify</c>.
+/// </summary>
 public class AuthService
 {
     private const string UserId = "user";

@@ -31,9 +31,6 @@ public static class AppPaths
     public static string GetLogDir() =>
         Path.Combine(GetConfigDir(), "logs");
 
-    public static string GetUserInfoPath() =>
-        Path.Combine(GetTokenStorePath(), "user_info.json");
-
     public static void EnsureDirectoriesExist()
     {
         var configDir = GetConfigDir();

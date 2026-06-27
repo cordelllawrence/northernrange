@@ -21,6 +21,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="northernrange.Tests" />
+    <!-- The test project lives under this directory; keep its sources out of the
+         main app's default **/*.cs compilation glob. -->
+    <Compile Remove="tests/**/*.cs" />
+    <None Remove="tests/**/*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Cocona" Version="2.2.0" />
     <PackageReference Include="Google.Apis.Gmail.v1" Version="1.68.0.3399" />
     <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />

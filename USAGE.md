@@ -304,11 +304,13 @@ List saved drafts sorted newest-first. Shows Draft ID, date, recipient, and subj
 nr drafts list
 nr drafts list -n 10
 nr drafts list --json
+nr drafts list --page-token <token-from-previous-output>
 ```
 
 | Option | Description |
 |---|---|
 | `-n` / `--max` | Max drafts to return (1–100). Default: 25. |
+| `--page-token` | Pagination token from a previous list response. |
 
 ### `nr drafts send <draft-id>`
 
@@ -339,5 +341,4 @@ nr drafts delete r8234567890123456
 | 3 | Authentication required (`nr auth login`) |
 | 4 | API error |
 | 5 | Not found |
-| 6 | File conflict (use `--force` to overwrite) |
-| 7 | File error (missing path, unreadable file) |
+| 6 | File error (output exists without `--force`, unwritable path, missing/unreadable input file) |

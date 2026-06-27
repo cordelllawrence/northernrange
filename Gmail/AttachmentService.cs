@@ -6,6 +6,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail attachment operations: enumerate a message's attachment parts and
+/// download attachment bytes to disk (base64url-decoded). Filenames are resolved
+/// from the message payload; output paths may be a file or a directory.
+/// </summary>
 public class AttachmentService
 {
     private readonly MimeParser _mimeParser;
@@ -31,14 +36,9 @@ public class AttachmentService
             req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
             msg = await req.ExecuteAsync(ct);
         }
-        catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            throw new NrException(ExitCodes.NotFound, $"Message '{messageId}' not found.");
-        }
         catch (Google.GoogleApiException ex)
         {
-            throw new NrException(ExitCodes.ApiError,
-                $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}");
+            throw GmailErrorMapper.Map(ex, $"Message '{messageId}' not found.");
         }
 
         var attachments = _mimeParser.ExtractAttachments(msg.Payload);
@@ -75,15 +75,10 @@ public class AttachmentService
                 .Get("me", messageId, attachmentId)
                 .ExecuteAsync(ct);
         }
-        catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            throw new NrException(ExitCodes.NotFound,
-                $"Attachment '{attachmentId}' not found in message '{messageId}'.");
-        }
         catch (Google.GoogleApiException ex)
         {
-            throw new NrException(ExitCodes.ApiError,
-                $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}");
+            throw GmailErrorMapper.Map(ex,
+                $"Attachment '{attachmentId}' not found in message '{messageId}'.");
         }
 
         if (string.IsNullOrEmpty(body.Data))
@@ -124,7 +119,16 @@ public class AttachmentService
     {
         var req = gmail.Users.Messages.Get("me", messageId);
         req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
-        var msg = await req.ExecuteAsync(ct);
+
+        Google.Apis.Gmail.v1.Data.Message msg;
+        try
+        {
+            msg = await req.ExecuteAsync(ct);
+        }
+        catch (Google.GoogleApiException ex)
+        {
+            throw GmailErrorMapper.Map(ex, $"Message '{messageId}' not found.");
+        }
 
         var attachments = _mimeParser.ExtractAttachments(msg.Payload);
         var match = attachments.FirstOrDefault(a => a.AttachmentId == attachmentId);

@@ -8,7 +8,6 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class MessagesCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -34,6 +33,7 @@ public class MessagesCommands
         _logger = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("list", Description = "List messages. Returns ID, From, Subject, Date, and snippet. See USAGE.md for query syntax and examples.")]
     public async Task ListAsync(
         GlobalOptions globals,
@@ -51,7 +51,7 @@ public class MessagesCommands
         var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "messages.list" });
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
 
         // Resolve label name to ID (e.g. "Inbox" → "INBOX")
         var resolvedLabel = (await _labelService.GetAsync(gmail, effectiveLabel)).Id;
@@ -85,6 +85,7 @@ public class MessagesCommands
             _output.WritePlain($"Next page: nr messages list --page-token {result.NextPageToken}");
     }
 
+    [ErrorHandlingFilter]
     [Command("label", Description = "Add or remove labels on a message. Accepts label IDs or display names.")]
     public async Task LabelAsync(
         GlobalOptions globals,
@@ -105,7 +106,7 @@ public class MessagesCommands
             ["MessageId"] = id
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
 
         // Resolve label names to IDs
         var addIds = await ResolveLabelIdsAsync(gmail, add);
@@ -142,6 +143,7 @@ public class MessagesCommands
         return ids;
     }
 
+    [ErrorHandlingFilter]
     [Command("read", Description = "Read a single message by ID. Decodes body and lists attachments. Get IDs from 'nr messages list'.")]
     public async Task ReadAsync(
         GlobalOptions globals,
@@ -160,19 +162,23 @@ public class MessagesCommands
             ["MessageId"] = id
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+
+        // Raw format (non-JSON): stream the original RFC 2822 bytes straight to
+        // stdout — binary-safe, suitable for piping to a .eml file or another tool.
+        if (format == "raw" && mode != OutputMode.Json)
+        {
+            var rawBytes = await _messageService.GetRawAsync(gmail, id);
+            await using var stdout = Console.OpenStandardOutput();
+            await stdout.WriteAsync(rawBytes);
+            return;
+        }
+
         var message = await _messageService.GetAsync(gmail, id, format, headerNames);
 
         if (mode == OutputMode.Json)
         {
             _output.WriteJson(message);
-            return;
-        }
-
-        // For raw format, output directly to stdout
-        if (format == "raw" && message.Body?.Text is not null)
-        {
-            Console.Write(message.Body.Text);
             return;
         }
 
