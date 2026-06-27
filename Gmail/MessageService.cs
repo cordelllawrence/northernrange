@@ -8,6 +8,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail <c>users.messages</c> operations: list, read (metadata/full/raw),
+/// and label modification. Maps Google API types to <see cref="Models"/> records
+/// and translates <see cref="Google.GoogleApiException"/> into <see cref="NrException"/>.
+/// </summary>
 public class MessageService
 {
     private static readonly string[] DefaultMetadataHeaders = ["From", "To", "Subject", "Date", "Cc", "Message-ID"];

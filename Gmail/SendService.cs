@@ -8,6 +8,12 @@ using NrMimeParser = NorthernRange.Mime.MimeParser;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Composes and sends mail and manages drafts. Builds RFC 2822 messages with
+/// MimeKit (base64url-encoded into <c>Message.Raw</c>), sets reply threading
+/// headers (<c>In-Reply-To</c>/<c>References</c>), and wraps
+/// <c>users.messages.send</c> and <c>users.drafts</c>.
+/// </summary>
 public class SendService
 {
     private readonly ILogger<SendService> _logger;

@@ -6,6 +6,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail attachment operations: enumerate a message's attachment parts and
+/// download attachment bytes to disk (base64url-decoded). Filenames are resolved
+/// from the message payload; output paths may be a file or a directory.
+/// </summary>
 public class AttachmentService
 {
     private readonly MimeParser _mimeParser;

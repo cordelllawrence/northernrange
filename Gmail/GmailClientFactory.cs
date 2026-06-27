@@ -5,6 +5,12 @@ using NorthernRange.Auth;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Builds and caches an authenticated <see cref="GmailService"/> per token-store
+/// path (i.e. per account), so repeated calls within one invocation reuse the
+/// same client and credential. The cache is guarded by a semaphore for safety
+/// even though the CLI is effectively single-threaded per command.
+/// </summary>
 public class GmailClientFactory
 {
     private readonly AuthService _authService;

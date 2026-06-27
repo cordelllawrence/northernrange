@@ -5,6 +5,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail <c>users.labels</c> operations: list, get, create, and delete. Accepts
+/// either a label ID or a display name; names are resolved to IDs via
+/// <see cref="ResolveNameToIdAsync"/> (ambiguous names are rejected).
+/// </summary>
 public class LabelService
 {
     private readonly ILogger<LabelService> _logger;

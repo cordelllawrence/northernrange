@@ -1,6 +1,6 @@
 # northernrange (`nr`)
 
-A focused, read-only Gmail command-line interface built for programmatic use.
+A focused Gmail command-line interface built for programmatic use.
 
 `nr` is designed to be consumed by **AI agents and automated pipelines** as its primary audience, while remaining ergonomic for direct human use at a terminal. Every command produces stable, machine-parseable JSON output via `--json`. Human-readable output is a convenience layered on top.
 
@@ -11,8 +11,9 @@ A focused, read-only Gmail command-line interface built for programmatic use.
 Most Gmail tools are built around interactive UIs. `nr` is built around the opposite philosophy:
 
 - **Headless-first.** `--json` output is a stable contract. Agents and scripts can depend on it.
-- **Safe by default.** Sending, drafts, and label management are opt-in commands with clear intent.
-- **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token and log files.
+- **Self-documenting.** `nr --llm` (and `--llm-full` / `--llm --json`) emits AI-consumable docs generated from the live command tree, so an agent can learn the CLI before using it.
+- **Safe by default.** Reads need no extra intent; sending, drafts, and label changes are explicit, separate commands. Permanent deletion of mail is intentionally not supported.
+- **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token, a small cached profile (`user_info.json`), and log files (plus whatever you explicitly `attachments download`).
 - **Composable.** List commands produce paginated JSON with `nextPageToken`. Output is pipe-friendly.
 - **Self-contained binary.** A single executable with no .NET runtime installation required on the target machine.
 
@@ -461,7 +462,17 @@ The config file is optional. All settings have defaults.
 
 ## Using with AI Agents and Scripts
 
-`nr` is built to be a reliable tool for AI agents that need to read Gmail. The `--json` flag is the integration surface.
+`nr` is built to be a reliable tool for AI agents that need to work with Gmail. The `--json` flag is the integration surface.
+
+**Teaching an agent the CLI.** Rather than parsing `--help`, point an agent at the self-generated docs, produced by reflecting over the live command tree (so they never drift from the real flags):
+
+```bash
+nr --llm            # concise Markdown: commands, flags, exit codes
+nr --llm-full       # full Markdown with per-command JSON output schemas
+nr --llm --json     # machine-readable JSON tool schema
+nr --llm messages   # filter to one command group (or "messages read" for one command)
+```
+
 
 **Typical agent workflow:**
 
@@ -569,12 +580,14 @@ Logs roll daily and are retained for 7 days. No email content is ever written to
 
 ## Roadmap
 
-Sending, drafts, and label management are now supported. Planned additions:
+Sending, drafts, and label management are now supported. Note that marking
+messages read/unread, archiving, and moving are already achievable today via
+`nr messages label` (e.g. `--remove UNREAD`, `--remove INBOX`). Planned additions:
 
 - Label rename
-- Marking messages read / unread
-- Moving and archiving messages
+- A dedicated `messages archive` / `mark` convenience wrapper over `messages label`
 - Forwarding messages
+- Pagination for `drafts list`
 
 ---
 

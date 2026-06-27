@@ -4,6 +4,15 @@
 **Date:** 2026-03-02
 **Status:** Phase 1 — Read-Only Gmail Client
 
+> ⚠️ **Historical document.** This spec captures the *original* Phase 1 design
+> (read-only, single account, `gmail.readonly`). The shipped tool (0.1.2-beta)
+> has moved beyond it: it requests **`gmail.modify`**, supports **multiple
+> accounts**, and can **send mail, manage drafts, and create/delete/apply
+> labels**. For the current state see `ARCHITECTURE.md`; for the user-facing
+> contract see `README.md` / `USAGE.md`. The sections below are preserved for
+> historical context, with inline ✅ *Shipped* / ⚠️ *Changed* notes where reality
+> now differs.
+
 ---
 
 ## Table of Contents
@@ -90,13 +99,19 @@ Flow at a high level:
 
 ### 3.2 OAuth2 Scope
 
-Phase 1 requests a single scope:
+> ⚠️ **Changed since Phase 1.** The shipped tool requests a single **`gmail.modify`**
+> scope (`https://www.googleapis.com/auth/gmail.modify`) — see
+> `Auth/AuthService.cs`. This is required for label mutation, sending, and draft
+> management, and still covers all read operations. Permanent deletion of mail
+> (which would need `https://mail.google.com/`) remains unsupported.
+
+The original Phase 1 design requested a single read-only scope:
 
 ```
 https://www.googleapis.com/auth/gmail.readonly
 ```
 
-No additional scopes are requested in Phase 1.
+No additional scopes were requested in Phase 1.
 
 ### 3.3 Credential and Token Storage
 
@@ -837,24 +852,26 @@ Use the `ConfigurableBackOff` provided by `Google.Apis` rather than implementing
 
 ## 11. Out of Scope — Phase 1
 
-The following features are explicitly deferred. No code, flags, or stubs for these features should appear in the Phase 1 codebase.
+These features were deferred in Phase 1. Several have since **shipped** (✅) as
+the tool moved to the `gmail.modify` scope; the remainder are still out of scope.
 
-| Feature | Reason deferred |
-|---|---|
-| Sending email (`nr messages send`) | Requires `gmail.send` scope; mutates mailbox state |
-| Composing and saving drafts | Requires `gmail.compose` scope |
-| Replying and forwarding | Requires send capability |
-| Moving messages between labels | Requires `gmail.modify` scope |
-| Archiving and deleting messages | Requires `gmail.modify` scope |
-| Marking messages read / unread | Requires `gmail.modify` scope |
-| Managing labels (create, rename, delete) | Requires `gmail.modify` scope |
-| Gmail Settings API (filters, vacation, forwarding) | Separate API surface and scope |
-| Push notifications / watch | Requires server infrastructure (Google Cloud Pub/Sub) |
-| Multi-account support | Single Google account per config directory in Phase 1 |
-| Offline mode / local message cache | Contradicts minimal local footprint philosophy |
-| S/MIME or PGP decryption | Complex key management; separate scope of work |
-| Interactive TUI (curses-style browsing) | Headless-first is the priority |
-| Email export to mbox format | Not required for read-only agent use case |
+| Feature | Original reason deferred | Status |
+|---|---|---|
+| Sending email (`nr send new`) | Requires send capability; mutates mailbox state | ✅ Shipped |
+| Composing and saving drafts (`nr drafts …`, `--draft`) | Requires compose capability | ✅ Shipped |
+| Replying (`nr send reply`) | Requires send capability | ✅ Shipped (forwarding not yet) |
+| Moving / archiving messages | Requires `gmail.modify` | ✅ Achievable via `nr messages label` (no dedicated wrapper yet) |
+| Marking messages read / unread | Requires `gmail.modify` | ✅ Achievable via `nr messages label --add/--remove UNREAD` |
+| Managing labels — create & delete (`nr labels create/delete`) | Requires `gmail.modify` | ✅ Shipped (rename still deferred) |
+| Multi-account support | Single account per config dir in Phase 1 | ✅ Shipped (`--account`, `tokens/<account>/`) |
+| Forwarding messages | Requires send capability | ❌ Still deferred |
+| Permanent deletion of messages | Requires `mail.google.com` scope | ❌ Intentionally unsupported |
+| Gmail Settings API (filters, vacation, forwarding) | Separate API surface and scope | ❌ Still deferred |
+| Push notifications / watch | Requires Google Cloud Pub/Sub infrastructure | ❌ Still deferred |
+| Offline mode / local message cache | Contradicts minimal local footprint philosophy | ❌ Still deferred |
+| S/MIME or PGP decryption | Complex key management; separate scope of work | ❌ Still deferred |
+| Interactive TUI (curses-style browsing) | Headless-first is the priority | ❌ Still deferred |
+| Email export to mbox format | Not required for the agent use case | ❌ Still deferred |
 
 ---
 

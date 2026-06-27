@@ -339,5 +339,4 @@ nr drafts delete r8234567890123456
 | 3 | Authentication required (`nr auth login`) |
 | 4 | API error |
 | 5 | Not found |
-| 6 | File conflict (use `--force` to overwrite) |
-| 7 | File error (missing path, unreadable file) |
+| 6 | File error (output exists without `--force`, unwritable path, missing/unreadable input file) |

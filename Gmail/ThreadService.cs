@@ -8,6 +8,11 @@ using NorthernRange.Models;
 
 namespace NorthernRange.Gmail;
 
+/// <summary>
+/// Gmail <c>users.threads</c> operations: list threads and read a thread's
+/// messages in chronological order. Mirrors <see cref="MessageService"/> for the
+/// thread resource family.
+/// </summary>
 public class ThreadService
 {
     private readonly MimeParser _mimeParser;

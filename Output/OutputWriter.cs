@@ -7,6 +7,11 @@ using Spectre.Console;
 
 namespace NorthernRange.Output;
 
+/// <summary>
+/// Central output sink. Chooses the active <see cref="OutputMode"/> (JSON / plain
+/// text / Spectre UI) and renders JSON, tables, and key-value blocks accordingly.
+/// JSON always serializes records as camelCase to stdout; diagnostics go to stderr.
+/// </summary>
 public class OutputWriter
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
