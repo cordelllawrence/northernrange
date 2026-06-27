@@ -100,36 +100,8 @@ public class SendService
         }
 
         var headers = NrMimeParser.ParseHeaders(original.Payload?.Headers);
-        headers.TryGetValue("Subject",    out var origSubject);
-        headers.TryGetValue("From",       out var origFrom);
-        headers.TryGetValue("To",         out var origTo);
-        headers.TryGetValue("Cc",         out var origCc);
         headers.TryGetValue("Message-ID", out var origMessageId);
-        headers.TryGetValue("References", out var origReferences);
-
-        var replySubject = origSubject?.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) == true
-            ? origSubject
-            : $"Re: {origSubject}";
-
-        // Reply-to is always the original sender
-        var to = new List<string>();
-        if (!string.IsNullOrWhiteSpace(origFrom)) to.Add(origFrom);
-
-        // --reply-all CCs all original recipients
-        List<string>? cc = null;
-        if (replyAll)
-        {
-            cc = [];
-            if (!string.IsNullOrWhiteSpace(origTo))
-                cc.AddRange(origTo.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
-            if (!string.IsNullOrWhiteSpace(origCc))
-                cc.AddRange(origCc.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
-        }
-
-        // Build References chain
-        var references = string.IsNullOrWhiteSpace(origReferences)
-            ? origMessageId
-            : $"{origReferences} {origMessageId}";
+        var (to, cc, replySubject, references) = BuildReplyFields(headers, replyAll);
 
         var rawMsg = await BuildRawMessageAsync(
             to, cc, null, replySubject, body, attachmentPaths,
@@ -275,6 +247,52 @@ public class SendService
         {
             throw GmailErrorMapper.Map(ex);
         }
+    }
+
+    // ── Reply field computation (pure; unit-tested) ──────────────────────────
+
+    /// <summary>
+    /// Derives reply recipients, subject, and the References chain from the
+    /// original message's headers. The reply goes to the original sender; with
+    /// <paramref name="replyAll"/>, the original To + Cc become the new Cc. The
+    /// subject gains a single "Re: " prefix (not stacked), and the new
+    /// Message-ID is appended to any existing References chain.
+    /// </summary>
+    internal static (List<string> To, List<string>? Cc, string Subject, string? References) BuildReplyFields(
+        IReadOnlyDictionary<string, string> headers, bool replyAll)
+    {
+        headers.TryGetValue("Subject", out var origSubject);
+        headers.TryGetValue("From", out var origFrom);
+        headers.TryGetValue("To", out var origTo);
+        headers.TryGetValue("Cc", out var origCc);
+        headers.TryGetValue("Message-ID", out var origMessageId);
+        headers.TryGetValue("References", out var origReferences);
+
+        var replySubject = origSubject?.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) == true
+            ? origSubject
+            : $"Re: {origSubject}";
+
+        // Reply-to is always the original sender.
+        var to = new List<string>();
+        if (!string.IsNullOrWhiteSpace(origFrom)) to.Add(origFrom);
+
+        // --reply-all CCs all original recipients (original To + Cc).
+        List<string>? cc = null;
+        if (replyAll)
+        {
+            cc = [];
+            if (!string.IsNullOrWhiteSpace(origTo))
+                cc.AddRange(origTo.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
+            if (!string.IsNullOrWhiteSpace(origCc))
+                cc.AddRange(origCc.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
+        }
+
+        // Append the original Message-ID to the References chain.
+        var references = string.IsNullOrWhiteSpace(origReferences)
+            ? origMessageId
+            : $"{origReferences} {origMessageId}";
+
+        return (to, cc, replySubject, references);
     }
 
     // ── MIME builder ─────────────────────────────────────────────────────────
