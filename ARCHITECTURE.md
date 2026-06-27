@@ -201,5 +201,4 @@ These are tracked in detail in `CODE-REVIEW.md`. In brief:
 - A few dead members: `OutputWriter.WriteError`, `AppPaths.GetUserInfoPath`,
   and `config.httpTimeoutSeconds` (read but never applied).
 - `drafts delete` skips the `--json` contract; `drafts list` exposes no paging.
-</content>
 </invoke>

@@ -83,11 +83,6 @@ public class OutputWriter
         }
     }
 
-    public void WriteError(string message)
-    {
-        Console.Error.WriteLine(message);
-    }
-
     public void WriteDivider(string label = "")
     {
         if (string.IsNullOrEmpty(label))

@@ -7,7 +7,6 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class AttachmentsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -30,6 +29,7 @@ public class AttachmentsCommands
         _logger = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("list", Description = "List attachments in a message without downloading. Use --json to get attachment IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
@@ -44,7 +44,7 @@ public class AttachmentsCommands
             ["MessageId"] = messageId
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var result = await _attachmentService.ListFromMessageAsync(gmail, messageId);
 
         if (mode == OutputMode.Json)
@@ -74,6 +74,7 @@ public class AttachmentsCommands
         _output.WriteTable(headers, rows, mode);
     }
 
+    [ErrorHandlingFilter]
     [Command("download", Description = "Download an attachment to disk. Get attachment IDs from 'nr attachments list <id> --json'.")]
     public async Task DownloadAsync(
         GlobalOptions globals,
@@ -92,7 +93,7 @@ public class AttachmentsCommands
             ["AttachmentId"] = attachmentId
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var result = await _attachmentService.DownloadAsync(gmail, messageId, attachmentId, output, force);
 
         if (mode == OutputMode.Json)

@@ -7,11 +7,11 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class ThreadsCommands
 {
     private readonly GmailClientFactory _gmailFactory;
     private readonly ThreadService _threadService;
+    private readonly LabelService _labelService;
     private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<ThreadsCommands> _logger;
@@ -19,17 +19,20 @@ public class ThreadsCommands
     public ThreadsCommands(
         GmailClientFactory gmailFactory,
         ThreadService threadService,
+        LabelService labelService,
         AccountResolver resolver,
         OutputWriter output,
         ILogger<ThreadsCommands> logger)
     {
         _gmailFactory = gmailFactory;
         _threadService = threadService;
+        _labelService = labelService;
         _resolver = resolver;
         _output = output;
         _logger = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("list", Description = "List email threads. Supports --label, --query, --max, and --page-token.")]
     public async Task ListAsync(
         GlobalOptions globals,
@@ -46,8 +49,11 @@ public class ThreadsCommands
         var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "threads.list" });
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
-        var result = await _threadService.ListAsync(gmail, effectiveLabel, query, effectiveMax, pageToken);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+
+        // Resolve label name to ID (e.g. "Work/Projects" → "Label_18"), matching `messages list`
+        var resolvedLabel = (await _labelService.GetAsync(gmail, effectiveLabel)).Id;
+        var result = await _threadService.ListAsync(gmail, resolvedLabel, query, effectiveMax, pageToken);
 
         if (mode == OutputMode.Json)
         {
@@ -75,6 +81,7 @@ public class ThreadsCommands
             _output.WritePlain($"Next page: nr threads list --page-token {result.NextPageToken}");
     }
 
+    [ErrorHandlingFilter]
     [Command("read", Description = "Read all messages in a thread in chronological order. Get IDs from 'nr threads list'.")]
     public async Task ReadAsync(
         GlobalOptions globals,
@@ -90,7 +97,7 @@ public class ThreadsCommands
             ["ThreadId"] = id
         });
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var thread = await _threadService.GetAsync(gmail, id, format);
 
         if (mode == OutputMode.Json)

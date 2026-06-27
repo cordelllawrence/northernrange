@@ -66,7 +66,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -96,7 +96,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         var headers = NrMimeParser.ParseHeaders(original.Payload?.Headers);
@@ -162,7 +162,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -171,6 +171,7 @@ public class SendService
     public async Task<DraftListResult> ListDraftsAsync(
         GmailService gmail,
         int maxResults,
+        string? pageToken = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("ListDrafts. Max={Max}", maxResults);
@@ -180,11 +181,12 @@ public class SendService
         {
             var listReq = gmail.Users.Drafts.List("me");
             listReq.MaxResults = maxResults;
+            listReq.PageToken = pageToken;
             listResp = await listReq.ExecuteAsync(ct);
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         if (listResp.Drafts is null || listResp.Drafts.Count == 0)
@@ -254,7 +256,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -271,7 +273,7 @@ public class SendService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
     }
 
@@ -321,21 +323,4 @@ public class SendService
 
         return new Message { Raw = raw };
     }
-
-    // ── Error mapping ─────────────────────────────────────────────────────────
-
-    private static NrException MapApiException(Google.GoogleApiException ex) =>
-        ex.HttpStatusCode switch
-        {
-            System.Net.HttpStatusCode.Unauthorized =>
-                new NrException(ExitCodes.AuthRequired, "Authentication expired. Run 'nr auth login'."),
-            System.Net.HttpStatusCode.Forbidden =>
-                new NrException(ExitCodes.ApiError,
-                    "Insufficient permissions — run 'nr auth login' to grant send/modify access."),
-            System.Net.HttpStatusCode.NotFound =>
-                new NrException(ExitCodes.NotFound, $"Resource not found: {ex.Error?.Message ?? ex.Message}"),
-            _ =>
-                new NrException(ExitCodes.ApiError,
-                    $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}")
-        };
 }

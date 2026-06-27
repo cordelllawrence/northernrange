@@ -50,7 +50,7 @@ public class MessageService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         if (listResp.Messages is null || listResp.Messages.Count == 0)
@@ -64,14 +64,31 @@ public class MessageService
             return new MessageListResult(minimal, listResp.NextPageToken, listResp.ResultSizeEstimate ?? 0);
         }
 
-        // Fetch metadata for each message in parallel
-        var tasks = listResp.Messages.Select(m => FetchSummaryAsync(gmail, m.Id, ct));
-        var summaries = await Task.WhenAll(tasks);
+        // Fetch metadata for each message with bounded concurrency. The list API
+        // returns only IDs, so a per-message get is unavoidable; capping parallelism
+        // keeps large --max values from spiking requests and triggering 429s.
+        var summaries = await FetchSummariesAsync(gmail, listResp.Messages, ct);
 
         return new MessageListResult(
-            summaries.ToList(),
+            summaries,
             listResp.NextPageToken,
             listResp.ResultSizeEstimate ?? 0);
+    }
+
+    private const int MaxConcurrentFetches = 10;
+
+    private async Task<List<MessageSummary>> FetchSummariesAsync(
+        GmailService gmail, IList<Message> messages, CancellationToken ct)
+    {
+        using var gate = new SemaphoreSlim(MaxConcurrentFetches);
+        var tasks = messages.Select(async m =>
+        {
+            await gate.WaitAsync(ct);
+            try { return await FetchSummaryAsync(gmail, m.Id, ct); }
+            finally { gate.Release(); }
+        });
+        // Task.WhenAll preserves input order in its result array.
+        return [.. await Task.WhenAll(tasks)];
     }
 
     private async Task<MessageSummary> FetchSummaryAsync(GmailService gmail, string id, CancellationToken ct)
@@ -135,7 +152,7 @@ public class MessageService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         var allHeaders = MimeParser.ParseHeaders(msg.Payload?.Headers);
@@ -171,6 +188,33 @@ public class MessageService
             msg.SizeEstimate ?? 0);
     }
 
+    /// <summary>
+    /// Fetches a message in <c>raw</c> format and returns the original RFC 2822
+    /// bytes (base64url-decoded). Used for binary-safe streaming to stdout — the
+    /// bytes must not be round-tripped through a string, which would corrupt any
+    /// non-UTF8 content.
+    /// </summary>
+    public async Task<byte[]> GetRawAsync(GmailService gmail, string id, CancellationToken ct = default)
+    {
+        var req = gmail.Users.Messages.Get("me", id);
+        req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Raw;
+
+        Message msg;
+        try
+        {
+            msg = await req.ExecuteAsync(ct);
+        }
+        catch (Google.GoogleApiException ex)
+        {
+            throw GmailErrorMapper.Map(ex, $"Message '{id}' not found.");
+        }
+
+        if (string.IsNullOrEmpty(msg.Raw))
+            throw new NrException(ExitCodes.ApiError, "Message has no raw content.");
+
+        return MimeParser.DecodeBase64Url(msg.Raw);
+    }
+
     public async Task<ModifyMessageResult> ModifyLabelsAsync(
         GmailService gmail,
         string messageId,
@@ -198,22 +242,9 @@ public class MessageService
         }
         catch (Google.GoogleApiException ex)
         {
-            throw MapApiException(ex);
+            throw GmailErrorMapper.Map(ex);
         }
 
         return new ModifyMessageResult(msg.Id, msg.LabelIds?.ToList() ?? []);
     }
-
-    private static NrException MapApiException(Google.GoogleApiException ex) =>
-        ex.HttpStatusCode switch
-        {
-            System.Net.HttpStatusCode.NotFound =>
-                new NrException(ExitCodes.NotFound, $"Resource not found: {ex.Error?.Message ?? ex.Message}"),
-            System.Net.HttpStatusCode.Unauthorized =>
-                new NrException(ExitCodes.AuthRequired, "Authentication expired. Run 'nr auth login'."),
-            System.Net.HttpStatusCode.Forbidden =>
-                new NrException(ExitCodes.ApiError, $"Access denied: {ex.Error?.Message ?? ex.Message}"),
-            _ =>
-                new NrException(ExitCodes.ApiError, $"Gmail API error ({(int)ex.HttpStatusCode}): {ex.Error?.Message ?? ex.Message}")
-        };
 }

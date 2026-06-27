@@ -12,9 +12,14 @@ using NorthernRange.Mime;
 using Cocona.Help;
 using NorthernRange.Output;
 
-// UTF-8 must be set before any output
-Console.OutputEncoding = Encoding.UTF8;
-Console.InputEncoding = Encoding.UTF8;
+// UTF-8 must be set before any output. Guarded: setting the console encoding
+// throws when stdin/stdout is redirected to a non-console handle (pipes, files).
+try
+{
+    Console.OutputEncoding = Encoding.UTF8;
+    Console.InputEncoding = Encoding.UTF8;
+}
+catch (IOException) { /* redirected handle — encoding stays at the host default */ }
 
 // Pre-scan raw args for Serilog configuration before host builds
 var isVerbose = args.Any(a => a is "--verbose" or "-v");

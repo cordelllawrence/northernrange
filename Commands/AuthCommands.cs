@@ -9,7 +9,6 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class AuthCommands
 {
     private readonly AuthService _authService;
@@ -32,6 +31,7 @@ public class AuthCommands
         _logger = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("login", Description = "Authenticate with Gmail via the OAuth2 browser flow. Run once; token is stored for subsequent commands.")]
     public async Task LoginAsync(
         GlobalOptions globals,
@@ -55,6 +55,7 @@ public class AuthCommands
             _output.WritePlain($"Authenticated successfully as {result.Email} (account: {ctx.AccountName})");
     }
 
+    [ErrorHandlingFilter]
     [Command("logout", Description = "Revoke and delete the stored OAuth2 token.")]
     public async Task LogoutAsync(GlobalOptions globals)
     {
@@ -71,8 +72,9 @@ public class AuthCommands
             _output.WritePlain($"Logged out (account: {ctx.AccountName}). Token revoked.");
     }
 
+    [ErrorHandlingFilter]
     [Command("status", Description = "Show authentication state. With --account: show one account. Without: show all accounts.")]
-    public async Task StatusAsync(GlobalOptions globals)
+    public async Task<int> StatusAsync(GlobalOptions globals)
     {
         var config = _resolver.LoadConfig(globals.Config);
         var mode = _output.DetermineMode(globals, config);
@@ -98,8 +100,7 @@ public class AuthCommands
                 WriteStatusPlain(ctx.AccountName, status, config, mode);
             }
 
-            Environment.Exit(status.Authenticated ? ExitCodes.Success : ExitCodes.AuthRequired);
-            return;
+            return status.Authenticated ? ExitCodes.Success : ExitCodes.AuthRequired;
         }
 
         // No --account: show all configured accounts
@@ -141,7 +142,7 @@ public class AuthCommands
             }
         }
 
-        Environment.Exit(anyAuthenticated ? ExitCodes.Success : ExitCodes.AuthRequired);
+        return anyAuthenticated ? ExitCodes.Success : ExitCodes.AuthRequired;
     }
 
     private void WriteStatusPlain(string accountName, AuthStatusResult status, AppConfig config, OutputMode mode)

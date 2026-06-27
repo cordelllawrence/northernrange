@@ -170,4 +170,3 @@ contract; wrap the input assignment defensively.
 
 A single PR for group 1 would remove the most code and the most inconsistency for
 the least risk.
-</content>

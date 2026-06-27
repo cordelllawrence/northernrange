@@ -8,7 +8,6 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-[ErrorHandlingFilter]
 public class SendCommands
 {
     private readonly GmailClientFactory _gmailFactory;
@@ -31,6 +30,7 @@ public class SendCommands
         _logger       = logger;
     }
 
+    [ErrorHandlingFilter]
     [Command("new", Description = "Compose and send a new message. Body from --body, --body-file, or stdin. Use --draft to save instead.")]
     public async Task NewAsync(
         GlobalOptions globals,
@@ -58,7 +58,7 @@ public class SendCommands
         });
 
         var bodyText = await ResolveBodyAsync(body, bodyFile);
-        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var result   = await _sendService.SendNewAsync(
             gmail, to, cc, bcc, subject, bodyText, attach, draft);
 
@@ -74,6 +74,7 @@ public class SendCommands
             _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
     }
 
+    [ErrorHandlingFilter]
     [Command("reply", Description = "Reply to an existing message. Threading headers set automatically. Get IDs from 'nr messages list'.")]
     public async Task ReplyAsync(
         GlobalOptions globals,
@@ -94,7 +95,7 @@ public class SendCommands
         });
 
         var bodyText = await ResolveBodyAsync(body, bodyFile);
-        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath);
+        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
         var result   = await _sendService.SendReplyAsync(
             gmail, messageId, bodyText, attach, replyAll, draft);
 
