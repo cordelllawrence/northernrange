@@ -144,7 +144,7 @@ Token expires:  2026-03-03 01:12:00Z (valid)
 
 ```
 nr messages list   [--label <id>] [--query <q>] [--max <n>] [--page-token <token>] [--format minimal|metadata]
-nr messages read   <id>  [--format full|raw|metadata] [--include-headers <names>]
+nr messages read   <id>  [--format full|metadata|minimal|raw] [--include-headers <names>]
 nr messages label  <id>  [--add <label>]... [--remove <label>]...
 ```
 
@@ -205,8 +205,9 @@ JSON output shape:
 | `<id>` | Gmail message ID (from `messages list`) |
 | `--format full` | Default. Decoded body text + attachment list |
 | `--format metadata` | Headers only (no body fetch) |
+| `--format minimal` | IDs and labels only |
 | `--format raw` | Raw RFC 2822 bytes to stdout — pipe to other tools |
-| `--include-headers <names>` | Comma-separated header names for `metadata` format |
+| `--include-headers <names>` | Header names for `metadata` format, comma-separated or repeated |
 
 ```bash
 # Read a message (full body)
@@ -231,8 +232,8 @@ Add or remove labels on a message. Accepts label IDs or display names. At least 
 
 | Flag | Short | Description |
 |---|---|---|
-| `--add <label>` | `-a` | Label to add. Repeat for multiple. |
-| `--remove <label>` | `-r` | Label to remove. Repeat for multiple. |
+| `--add <label>` | | Label to add. Repeat for multiple. |
+| `--remove <label>` | | Label to remove. Repeat for multiple. |
 
 ```bash
 # Add a label
@@ -242,7 +243,18 @@ nr messages label 19cb08f9253d9482 --add "Work/Projects"
 nr messages label 19cb08f9253d9482 --add "Archive" --remove INBOX
 
 # Multiple labels
-nr messages label 19cb08f9253d9482 -a "Urgent" -a "Needs Review"
+nr messages label 19cb08f9253d9482 --add "Urgent" --add "Needs Review"
+```
+
+#### `messages send` and `messages reply`
+
+Compose a new message or reply to one. Body comes from `--body`, `--body-file`, or stdin. Add `--draft` to save instead of sending. See [docs/USAGE.md](docs/USAGE.md) for every flag.
+
+```bash
+nr messages send -t alice@example.com -s "Hello" --body "Hi there"
+nr messages send -t alice@example.com -s "Report" --body-file report.txt -a report.pdf
+nr messages reply 19cb08f9253d9482 --body "Thanks, sounds good." --reply-all
+nr messages reply 19cb08f9253d9482 --body "WIP" --draft
 ```
 
 ---
@@ -276,7 +288,7 @@ nr threads read 19cb04f07919b8a7 --json
 
 ```
 nr labels list
-nr labels info    <id-or-name>
+nr labels show    <id-or-name>
 nr labels create  <name>  [--text-color <hex>] [--bg-color <hex>]
 nr labels delete  <id-or-name>
 ```
@@ -290,14 +302,14 @@ nr labels list
 nr labels list --json
 ```
 
-#### `labels info`
+#### `labels show`
 
 Gets detailed information for a single label. Accepts either the label ID or its display name. If a name matches multiple labels, exits with code 2.
 
 ```bash
-nr labels info INBOX
-nr labels info "Work/Projects"
-nr labels info Label_18
+nr labels show INBOX
+nr labels show "Work/Projects"
+nr labels show Label_18
 ```
 
 ```
@@ -404,10 +416,10 @@ These flags are accepted by every command:
 | `--credentials <path>` | | Path to `client_secrets.json` (overrides config and default location) |
 | `--config <path>` | | Path to `config.json` (overrides default location) |
 | `--account <name>` | | Account name to use. Overrides `NR_ACCOUNT` env and config `defaultAccount`. Default: `"default"` |
-| `--log` | | Enable JSONL debug logging to a timestamped file (`nr-YYYYMMDD.jsonl`) in the current directory |
-| `--log-flat` | | Enable structured text logging to a timestamped file (`nr-YYYYMMDD.log`) in the current directory |
-| `--log-file <path>` | | Write log to this path (appends if exists). Format follows `--log` or `--log-flat` |
-| `--log-level <level>` | | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error` |
+| `--log` | | Write a log file in the current directory: `nr-YYYYMMDD.jsonl` (or `.log` with `--log-format text`) |
+| `--log-format <fmt>` | | Log file format: `jsonl` (default) or `text` |
+| `--log-file <path>` | | Write the log to this path instead (appends if it exists). Implies `--log` |
+| `--log-level <level>` | | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error`, `fatal` |
 
 ---
 

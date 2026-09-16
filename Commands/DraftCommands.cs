@@ -30,13 +30,13 @@ public class DraftCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List saved drafts sorted newest-first. Use --json to get draft IDs.")]
+    [Command("list", Description = "List saved drafts, newest first. Use --json to get draft IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('n', Description = "Max drafts to return (1–100). Default: 25.")] int max = 25,
+        [Option('n', Description = "Max drafts to return (1-500). Default: 25.")] int max = 25,
         [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null)
     {
-        ParamValidation.RequireRange(max, 1, 100, "max");
+        ParamValidation.RequireRange(max, 1, 500, "max");
 
         var ctx  = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
@@ -75,7 +75,7 @@ public class DraftCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("send", Description = "Send an existing draft immediately. Get draft IDs from 'nr drafts list --json'.")]
+    [Command("send", Description = "Send a saved draft now. Get draft IDs from 'nr drafts list --json'.")]
     public async Task SendAsync(
         GlobalOptions globals,
         [Argument(Description = "Draft ID to send. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
@@ -98,11 +98,11 @@ public class DraftCommands
             return;
         }
 
-        _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
+        _output.WritePlain($"Sent message {result.MessageId} (thread {result.ThreadId}).");
     }
 
     [ErrorHandlingFilter]
-    [Command("delete", Description = "Permanently delete a draft. Cannot be undone. Get draft IDs from 'nr drafts list --json'.")]
+    [Command("delete", Description = "Delete a draft permanently. Get draft IDs from 'nr drafts list --json'.")]
     public async Task DeleteAsync(
         GlobalOptions globals,
         [Argument(Description = "Draft ID to delete. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
@@ -125,6 +125,6 @@ public class DraftCommands
             return;
         }
 
-        _output.WritePlain($"Draft {draftId} deleted.");
+        _output.WritePlain($"Deleted draft {draftId}.");
     }
 }

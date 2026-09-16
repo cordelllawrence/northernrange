@@ -19,79 +19,82 @@ Baseline at start of sweep (2026-09-16):
 
 ## Phase 1 — CLI language: verbs, nouns, flags, values
 
+Decisions and outcomes: `2026-09-16-phase-1-cli-grammar.md`. The one open item
+(`--to` / `--subject` required at the parser) moved to Phase 2.
+
 Goal: a consistent, predictable command grammar. This is the surface agents
 learn from `--llm`, so every inconsistency here is a prompt-engineering tax.
 
 ### 1a. Command tree (nouns and verbs)
 
-- [ ] **(seed)** Group names are nouns except `send`, which is a verb. `send new` and
+- [x] **(seed)** Group names are nouns except `send`, which is a verb. `send new` and
       `send reply` sit oddly beside `messages`, `threads`, `drafts`. Decide: keep
       `send` as a verb group, or move to `messages send` / `messages reply`, or a
       `compose` noun.
-- [ ] **(seed)** Draft creation lives in two places: `send new --draft` and the
+- [x] **(seed)** Draft creation lives in two places: `send new --draft` and the
       `drafts` group. Decide whether `drafts create` / `drafts reply` should exist,
       or whether `--draft` on `send` is the only way.
-- [ ] **(seed)** Single-resource fetch verb varies: `messages read`, `threads read`,
+- [x] **(seed)** Single-resource fetch verb varies: `messages read`, `threads read`,
       `labels info`. Pick one (`read`, `show`, or `get`) across all groups.
-- [ ] **(seed)** `messages label <id>` uses a noun as a verb. Compare with
+- [x] **(seed)** `messages label <id>` uses a noun as a verb. Compare with
       `messages modify`, `messages tag`, or `labels apply`.
-- [ ] Missing verbs worth a deliberate yes/no: `messages archive`, `messages trash`,
+- [x] Missing verbs worth a deliberate yes/no: `messages archive`, `messages trash`,
       `messages mark-read` / `--unread`, `labels rename` / `labels update`,
       `drafts read`, `threads label`, `auth accounts` (list accounts).
-- [ ] Is `attachments` a top-level noun, or does it belong under `messages` (an
+- [x] Is `attachments` a top-level noun, or does it belong under `messages` (an
       attachment has no identity without a message ID)?
-- [ ] Deletion verbs: `labels delete`, `drafts delete`. Should destructive verbs take
+- [x] Deletion verbs: `labels delete`, `drafts delete`. Should destructive verbs take
       `--yes` / `--confirm` for human use, or is "explicit verb is the consent" the
       documented policy for an agent-first tool? Write the policy down either way.
 
 ### 1b. Short flags and long-flag names
 
-- [ ] **(seed)** `-a` means `--add` in `messages label` and `--attach` in `send new`
+- [x] **(seed)** `-a` means `--add` in `messages label` and `--attach` in `send new`
       / `send reply`. One short flag, two meanings.
-- [ ] **(seed)** `--force` means "overwrite the file" in `attachments download` and
+- [x] **(seed)** `--force` means "overwrite the file" in `attachments download` and
       "discard the token and re-consent" in `auth login`.
-- [ ] **(seed)** `--format` means "API response shape" on read commands, while output
+- [x] **(seed)** `--format` means "API response shape" on read commands, while output
       shape is controlled by `--json` / `--ui` / `defaultOutputFormat`. The word
       "format" is overloaded across the flag and the config key.
-- [ ] **(seed)** `-n` / `--max` allows 1–500 on messages and threads but 1–100 on drafts.
+- [x] **(seed)** `-n` / `--max` allows 1–500 on messages and threads but 1–100 on drafts.
       Document why or unify. Consider `--limit` as the conventional name.
-- [ ] **(seed)** `--log-flat` is an odd name. Consider `--log-format jsonl|text`.
-- [ ] Short-flag inventory across all commands: `-a -c -l -n -o -q -r -s -t -v`.
+- [x] **(seed)** `--log-flat` is an odd name. Consider `--log-format jsonl|text`.
+- [x] Short-flag inventory across all commands: `-a -c -l -n -o -q -r -s -t -v`.
       Confirm no clashes with global options and that every common repeat flag has one.
-- [ ] Long-flag style: all kebab-case? (`--page-token`, `--body-file`,
+- [x] Long-flag style: all kebab-case? (`--page-token`, `--body-file`,
       `--include-headers`, `--reply-all`, `--text-color`, `--bg-color`). Check `bg`
       vs `background`.
-- [ ] Positional vs option: `attachments download <msg> <att>` vs everything else
+- [x] Positional vs option: `attachments download <msg> <att>` vs everything else
       taking a single positional. Fine, but confirm the rule and state it.
 
 ### 1c. Flag values and enums
 
-- [ ] **(seed)** `--format` value sets differ per command: messages list
+- [x] **(seed)** `--format` value sets differ per command: messages list
       `metadata|minimal`, messages read `full|metadata|raw`, threads read
       `full|metadata|minimal`. No `raw` for threads, no `minimal` for messages read.
       Decide the canonical set and which commands support which.
-- [ ] **(seed)** `--include-headers` is documented as comma-separated in `docs/USAGE.md`
+- [x] **(seed)** `--include-headers` is documented as comma-separated in `docs/USAGE.md`
       but implemented as a repeatable option. Pick one, or support both.
 - [ ] **(seed)** `--to` and `--subject` are documented "Required" but declared optional
       with manual validation, so `--help` and the `--llm` schema show them as
       optional. Make Cocona enforce it so the generated docs are truthful.
-- [ ] Case sensitivity of enum-like values (`--format RAW`, `--log-level DEBUG`).
-- [ ] `--log-level` accepts `fatal` in code but the help text does not list it.
-- [ ] `NR_JSON` only accepts `1`. Accept `true`/`yes` too, or document strictly.
-- [ ] Environment-variable coverage: `NR_ACCOUNT NR_CREDENTIALS NR_CONFIG
+- [x] Case sensitivity of enum-like values (`--format RAW`, `--log-level DEBUG`).
+- [x] `--log-level` accepts `fatal` in code but the help text does not list it.
+- [x] `NR_JSON` only accepts `1`. Accept `true`/`yes` too, or document strictly.
+- [x] Environment-variable coverage: `NR_ACCOUNT NR_CREDENTIALS NR_CONFIG
       NR_DEFAULT_LABEL NR_MAX_RESULTS NR_JSON`. No env for `--verbose`, `--ui`,
       `--log*`. Decide the rule for which flags get an env twin.
 
 ### 1d. Help and description text
 
-- [ ] **(seed)** Group descriptions in `NorthernRangeApp` are stale: "messages (list,
+- [x] **(seed)** Group descriptions in `NorthernRangeApp` are stale: "messages (list,
       read)" omits `label`; "labels (list, info)" omits `create`, `delete`.
-- [ ] Every `[Command]` and `[Option]` description: same voice, same tense, same
+- [x] Every `[Command]` and `[Option]` description: same voice, same tense, same
       punctuation, mentions where to get IDs, mentions defaults.
-- [ ] Success messages: "Sent.  Message-ID: …" (double space), "Deleted label 'id'."
+- [x] Success messages: "Sent.  Message-ID: …" (double space), "Deleted label 'id'."
       echoes the raw input rather than the resolved name. Standardise the sentence
       shape for create / delete / send / download.
-- [ ] Error-message style: "Provide at least one --add or --remove label." vs "At
+- [x] Error-message style: "Provide at least one --add or --remove label." vs "At
       least one --to / -t recipient is required." Pick one pattern.
 
 ---

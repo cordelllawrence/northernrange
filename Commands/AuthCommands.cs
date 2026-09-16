@@ -32,7 +32,7 @@ public class AuthCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("login", Description = "Authenticate with Gmail via the OAuth2 browser flow. Run once; token is stored for subsequent commands.")]
+    [Command("login", Description = "Authenticate with Gmail through the OAuth2 browser flow. Run once per account; the token is stored for later commands.")]
     public async Task LoginAsync(
         GlobalOptions globals,
         [Option("force", Description = "Delete the stored token and re-run the full browser consent flow.")]
@@ -56,7 +56,7 @@ public class AuthCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("logout", Description = "Revoke and delete the stored OAuth2 token.")]
+    [Command("logout", Description = "Revoke the stored OAuth2 token with Google and delete it locally.")]
     public async Task LogoutAsync(GlobalOptions globals)
     {
         var ctx = _resolver.Resolve(globals);
@@ -73,7 +73,7 @@ public class AuthCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("status", Description = "Show authentication state. With --account: show one account. Without: show all accounts.")]
+    [Command("status", Description = "Show authentication state for one account (--account) or all accounts. No network call.")]
     public async Task<int> StatusAsync(GlobalOptions globals)
     {
         var config = _resolver.LoadConfig(globals.Config);

@@ -69,7 +69,7 @@ public class LlmDocGeneratorTests
         foreach (var cmd in new[]
         {
             "nr auth login", "nr messages list", "nr messages read", "nr threads list",
-            "nr labels create", "nr attachments download", "nr send new", "nr drafts send",
+            "nr labels create", "nr attachments download", "nr messages send", "nr drafts send",
         })
             Assert.Contains(cmd, md);
     }
@@ -115,7 +115,7 @@ public class LlmDocGeneratorTests
         var names = doc.RootElement.GetProperty("commands").EnumerateArray()
             .Select(c => c.GetProperty("name").GetString()).ToList();
 
-        Assert.Contains("send reply", names);
+        Assert.Contains("messages reply", names);
         Assert.Contains("labels delete", names);
         Assert.Contains("messages label", names);
     }

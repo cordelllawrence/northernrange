@@ -9,6 +9,8 @@ namespace NorthernRange.Commands;
 
 public class ThreadsCommands
 {
+    public static readonly string[] ReadFormats = ["full", "metadata", "minimal"];
+
     private readonly GmailClientFactory _gmailFactory;
     private readonly ThreadService _threadService;
     private readonly LabelService _labelService;
@@ -33,12 +35,12 @@ public class ThreadsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List email threads. Supports --label, --query, --max, and --page-token.")]
+    [Command("list", Description = "List threads with ID, message count, and snippet. Same filters as 'nr messages list'.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('l', Description = "Filter by label ID or name (default: INBOX).")] string? label = null,
-        [Option('q', Description = "Gmail search query — same syntax as the Gmail search box.")] string? query = null,
-        [Option('n', Description = "Max threads to return (1–500). Default: 25.")] int? max = null,
+        [Option('l', Description = "Filter by label ID or name. Default: INBOX. Get user label IDs from 'nr labels list'.")] string? label = null,
+        [Option('q', Description = "Gmail search query, same syntax as the Gmail search box.")] string? query = null,
+        [Option('n', Description = "Max threads to return (1-500). Default: 25.")] int? max = null,
         [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null)
     {
         var ctx = _resolver.Resolve(globals);
@@ -82,14 +84,15 @@ public class ThreadsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("read", Description = "Read all messages in a thread in chronological order. Get IDs from 'nr threads list'.")]
+    [Command("read", Description = "Read every message in a thread, oldest first. Get IDs from 'nr threads list'.")]
     public async Task ReadAsync(
         GlobalOptions globals,
         [Argument(Description = "Gmail thread ID. Get from 'nr threads list'.")] string id,
-        [Option("format", Description = "'full' (default): body text. 'metadata': headers only. 'minimal': IDs only.")] string format = "full")
+        [Option("format", Description = "Detail level: 'full' (default) body text; 'metadata' headers only; 'minimal' IDs only.")] string format = "full")
     {
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
+        format = ParamValidation.RequireOneOf(format, ReadFormats, "format");
 
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {

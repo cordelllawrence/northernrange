@@ -14,16 +14,16 @@ Available on every command.
 
 | Option | Description |
 |---|---|
-| `--json` | Output machine-readable JSON to stdout. Also enabled by `NR_JSON=1`. |
+| `--json` | Output machine-readable JSON to stdout. Also enabled by `NR_JSON=1` (or `true` / `yes`). |
 | `--ui` | Enable Spectre.Console rich rendering (auto-disabled when stdout is redirected). |
 | `-v` / `--verbose` | Emit debug diagnostics to stderr. Never affects stdout. |
 | `--credentials <path>` | Path to `client_secrets.json`. Overrides config and the default location. |
 | `--config <path>` | Path to `config.json`. Overrides the default location. |
 | `--account <name>` | Account name to use. Overrides `NR_ACCOUNT` env var and config `defaultAccount`. Default: `"default"`. |
-| `--log` | Enable JSONL debug logging to a timestamped file (`nr-YYYYMMDD.jsonl`) in the current directory. |
-| `--log-flat` | Enable structured text logging to a timestamped file (`nr-YYYYMMDD.log`) in the current directory. |
-| `--log-file <path>` | Write log to this path (appends if exists). Format follows `--log` or `--log-flat`. |
-| `--log-level <level>` | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error`. |
+| `--log` | Write a log file in the current directory: `nr-YYYYMMDD.jsonl` (or `.log` with `--log-format text`). |
+| `--log-format <fmt>` | Log file format: `jsonl` (default) or `text`. |
+| `--log-file <path>` | Write the log to this path instead (appends if it exists). Implies `--log`. |
+| `--log-level <level>` | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error`, `fatal`. |
 
 Default credential path: `%APPDATA%\northernrange\client_secrets.json` (Windows) or `~/.config/northernrange/client_secrets.json` (macOS/Linux).
 
@@ -104,7 +104,7 @@ nr messages list --page-token 07712902107382443779
 | `-q` / `--query` | Gmail search query — same syntax as the Gmail search box. Passed unmodified to the API. |
 | `-n` / `--max` | Max messages to return (1–500). Default: 25. Also set via `defaultMaxResults` in config or `NR_MAX_RESULTS`. |
 | `--page-token` | Pagination token from a previous list response. |
-| `--format` | API response format. `metadata` (default): headers + snippet. `minimal`: IDs only, fastest. |
+| `--format` | Detail level. `metadata` (default): headers + snippet. `minimal`: IDs only, fastest. Values are case-insensitive. |
 
 ### `nr messages read <id>`
 
@@ -119,8 +119,8 @@ nr messages read <id> --format raw > message.eml
 
 | Option | Description |
 |---|---|
-| `--format` | `full` (default): decoded body and attachments. `metadata`: headers only, no body. `raw`: original RFC 2822 bytes written to stdout. |
-| `--include-headers` | Comma-separated headers to include with `--format metadata`. Default: `From,To,Cc,Subject,Date,Message-ID`. Header names are case-insensitive. |
+| `--format` | `full` (default): decoded body and attachments. `metadata`: headers only, no body. `minimal`: IDs and labels only. `raw`: original RFC 2822 bytes written to stdout. Values are case-insensitive. |
+| `--include-headers` | Headers to include with `--format metadata`, comma-separated or repeated. Default: `From,To,Cc,Subject,Date,Message-ID`. Header names are case-insensitive. |
 
 ### `nr messages label <id>`
 
@@ -129,13 +129,13 @@ Add or remove labels on a message. Accepts label IDs or display names. At least 
 ```
 nr messages label 19cb08f9253d9482 --add "Work/Projects"
 nr messages label <id> --add "Urgent" --remove INBOX
-nr messages label <id> -a "Needs Review" -a "Urgent" --json
+nr messages label <id> --add "Needs Review" --add "Urgent" --json
 ```
 
 | Option | Description |
 |---|---|
-| `-a` / `--add` | Label ID or name to add. Repeat for multiple. |
-| `-r` / `--remove` | Label ID or name to remove. Repeat for multiple. |
+| `--add` | Label ID or name to add. Repeat for multiple. |
+| `--remove` | Label ID or name to remove. Repeat for multiple. |
 
 ---
 
@@ -170,7 +170,7 @@ nr threads read <id> --format metadata
 
 | Option | Description |
 |---|---|
-| `--format` | `full` (default): body text for each message. `metadata`: headers only. `minimal`: IDs only. |
+| `--format` | `full` (default): body text for each message. `metadata`: headers only. `minimal`: IDs only. Values are case-insensitive. |
 
 ---
 
@@ -185,14 +185,14 @@ nr labels list
 nr labels list --json
 ```
 
-### `nr labels info <id>`
+### `nr labels show <id>`
 
 Show details for a single label: message counts, thread counts, unread counts, and color (user labels). Accepts either a label ID or display name. Exits with code 2 if a display name matches more than one label.
 
 ```
-nr labels info INBOX
-nr labels info "Financial Updates"
-nr labels info Label_18 --json
+nr labels show INBOX
+nr labels show "Financial Updates"
+nr labels show Label_18 --json
 ```
 
 ### `nr labels create <name>`
@@ -250,17 +250,17 @@ nr attachments download <msg-id> <att-id> -o ~/docs/report.pdf --force
 
 ---
 
-## send
+## messages (send and reply)
 
-### `nr send new`
+### `nr messages send`
 
 Compose and send a new email. Body text comes from `--body`, `--body-file`, or stdin (in that order). Use `--draft` to save instead of sending.
 
 ```
-nr send new -t alice@example.com -s "Hello" --body "Hi there"
-nr send new -t alice@example.com -t bob@example.com -s "Report" --body-file report.txt --attach report.pdf
-echo "Body text" | nr send new -t alice@example.com -s "Piped body"
-nr send new -t self@example.com -s "Draft" --body "WIP" --draft
+nr messages send -t alice@example.com -s "Hello" --body "Hi there"
+nr messages send -t alice@example.com -t bob@example.com -s "Report" --body-file report.txt --attach report.pdf
+echo "Body text" | nr messages send -t alice@example.com -s "Piped body"
+nr messages send -t self@example.com -s "Draft" --body "WIP" --draft
 ```
 
 | Option | Description |
@@ -274,14 +274,14 @@ nr send new -t self@example.com -s "Draft" --body "WIP" --draft
 | `-a` / `--attach` | Path to a local file to attach. Repeat for multiple. |
 | `--draft` | Save as a draft instead of sending. |
 
-### `nr send reply <message-id>`
+### `nr messages reply <message-id>`
 
 Reply to an existing message. Subject and threading headers (`In-Reply-To`, `References`) are set automatically. Body from `--body`, `--body-file`, or stdin. Use `--draft` to save instead of sending. Get message IDs from `nr messages list`.
 
 ```
-nr send reply 19cb08f9253d9482 --body "Thanks, sounds good."
-nr send reply <id> --reply-all --body "See attached" --attach report.pdf
-nr send reply <id> --body "WIP reply" --draft
+nr messages reply 19cb08f9253d9482 --body "Thanks, sounds good."
+nr messages reply <id> --reply-all --body "See attached" --attach report.pdf
+nr messages reply <id> --body "WIP reply" --draft
 ```
 
 | Option | Description |
@@ -309,7 +309,7 @@ nr drafts list --page-token <token-from-previous-output>
 
 | Option | Description |
 |---|---|
-| `-n` / `--max` | Max drafts to return (1–100). Default: 25. |
+| `-n` / `--max` | Max drafts to return (1–500). Default: 25. |
 | `--page-token` | Pagination token from a previous list response. |
 
 ### `nr drafts send <draft-id>`

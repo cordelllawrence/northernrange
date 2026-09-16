@@ -21,15 +21,15 @@ public record GlobalOptions(
     [Option("account", Description = "Account name to use. Overrides NR_ACCOUNT env var and config defaultAccount.")]
     string? Account = null,
 
-    [Option("log", Description = "Enable JSONL debug logging to a timestamped file in the current directory.")]
+    [Option("log", Description = "Write a log file (nr-YYYYMMDD.jsonl or .log) in the current directory. See --log-format and --log-file.")]
     bool Log = false,
 
-    [Option("log-flat", Description = "Enable structured text logging to a timestamped file in the current directory.")]
-    bool LogFlat = false,
+    [Option("log-format", Description = "Log file format: jsonl (default) or text.")]
+    string LogFormat = "jsonl",
 
-    [Option("log-file", Description = "Write log to this path (appends if exists). Format follows --log or --log-flat.")]
+    [Option("log-file", Description = "Write the log to this path instead (appends if it exists). Implies --log.")]
     string? LogFile = null,
 
-    [Option("log-level", Description = "Minimum log level: verbose, debug, information (default), warning, error.")]
+    [Option("log-level", Description = "Minimum log level: verbose, debug, information (default), warning, error, fatal.")]
     string? LogLevel = null
 ) : ICommandParameterSet;

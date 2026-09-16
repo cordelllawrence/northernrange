@@ -31,7 +31,7 @@ public class LabelsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List all labels (system and user-created). Use IDs with 'nr messages list --label'.")]
+    [Command("list", Description = "List all labels, system and user-created. Use the IDs with --label on list commands.")]
     public async Task ListAsync(GlobalOptions globals)
     {
         var ctx = _resolver.Resolve(globals);
@@ -61,8 +61,8 @@ public class LabelsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("info", Description = "Show details for a single label: counts and color. Accepts label ID or display name.")]
-    public async Task InfoAsync(
+    [Command("show", Description = "Show one label: counts and color. Accepts a label ID or display name. Get IDs from 'nr labels list'.")]
+    public async Task ShowAsync(
         GlobalOptions globals,
         [Argument(Description = "Label ID or display name. Get IDs from 'nr labels list'.")] string id)
     {
@@ -71,7 +71,7 @@ public class LabelsCommands
 
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            ["Command"] = "labels.info",
+            ["Command"] = "labels.show",
             ["LabelId"] = id
         });
 
@@ -105,7 +105,7 @@ public class LabelsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("create", Description = "Create a new user label. Optionally set text and background colors (hex, e.g. '#000000').")]
+    [Command("create", Description = "Create a user label. Optionally set text and background colors as hex, both together or neither.")]
     public async Task CreateAsync(
         GlobalOptions globals,
         [Argument(Description = "Display name for the new label.")] string name,
@@ -114,7 +114,7 @@ public class LabelsCommands
     {
         if ((textColor is null) != (bgColor is null))
             throw new NrException(ExitCodes.InvalidArguments,
-                "Both --text-color and --bg-color must be provided together, or neither.");
+                "Colors must be given as a pair. Use both --text-color and --bg-color, or neither.");
 
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
@@ -134,11 +134,11 @@ public class LabelsCommands
             return;
         }
 
-        _output.WritePlain($"Created label '{label.Name}'  ID: {label.Id}");
+        _output.WritePlain($"Created label '{label.Name}' ({label.Id}).");
     }
 
     [ErrorHandlingFilter]
-    [Command("delete", Description = "Delete a user label. Messages with this label are NOT deleted, only the label is removed.")]
+    [Command("delete", Description = "Delete a user label. Messages are kept; only the label is removed. Get IDs from 'nr labels list'.")]
     public async Task DeleteAsync(
         GlobalOptions globals,
         [Argument(Description = "Label ID or display name. Get IDs from 'nr labels list'.")] string id)

@@ -8,11 +8,19 @@ using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-public class MessagesCommands
+/// <summary>
+/// <c>nr messages …</c>: list, read, label, send, reply.
+/// Send and reply live in <c>MessagesCommands.Send.cs</c>.
+/// </summary>
+public partial class MessagesCommands
 {
+    public static readonly string[] ListFormats = ["metadata", "minimal"];
+    public static readonly string[] ReadFormats = ["full", "metadata", "minimal", "raw"];
+
     private readonly GmailClientFactory _gmailFactory;
     private readonly MessageService _messageService;
     private readonly LabelService _labelService;
+    private readonly SendService _sendService;
     private readonly AccountResolver _resolver;
     private readonly OutputWriter _output;
     private readonly ILogger<MessagesCommands> _logger;
@@ -21,6 +29,7 @@ public class MessagesCommands
         GmailClientFactory gmailFactory,
         MessageService messageService,
         LabelService labelService,
+        SendService sendService,
         AccountResolver resolver,
         OutputWriter output,
         ILogger<MessagesCommands> logger)
@@ -28,25 +37,27 @@ public class MessagesCommands
         _gmailFactory = gmailFactory;
         _messageService = messageService;
         _labelService = labelService;
+        _sendService = sendService;
         _resolver = resolver;
         _output = output;
         _logger = logger;
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List messages. Returns ID, From, Subject, Date, and snippet. See docs/USAGE.md for query syntax and examples.")]
+    [Command("list", Description = "List messages with ID, From, Subject, Date, and snippet. See docs/USAGE.md for query syntax.")]
     public async Task ListAsync(
         GlobalOptions globals,
-        [Option('l', Description = "Filter by label ID or name (default: INBOX). Get user label IDs from 'nr labels list'.")] string? label = null,
-        [Option('q', Description = "Gmail search query — same syntax as the Gmail search box.")] string? query = null,
-        [Option('n', Description = "Max messages to return (1–500). Default: 25.")] int? max = null,
+        [Option('l', Description = "Filter by label ID or name. Default: INBOX. Get user label IDs from 'nr labels list'.")] string? label = null,
+        [Option('q', Description = "Gmail search query, same syntax as the Gmail search box.")] string? query = null,
+        [Option('n', Description = "Max messages to return (1-500). Default: 25.")] int? max = null,
         [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null,
-        [Option("format", Description = "'metadata' (default): headers + snippet. 'minimal': IDs only.")] string format = "metadata")
+        [Option("format", Description = "Detail level: 'metadata' (default) adds headers and snippet; 'minimal' returns IDs only.")] string format = "metadata")
     {
         var ctx = _resolver.Resolve(globals);
         var effectiveLabel = label ?? ctx.Config.DefaultLabel;
         var effectiveMax = max ?? ctx.Config.DefaultMaxResults;
         ParamValidation.RequireRange(effectiveMax, 1, 500, "max");
+        format = ParamValidation.RequireOneOf(format, ListFormats, "format");
 
         var mode = _output.DetermineMode(globals, ctx.Config);
 
@@ -86,16 +97,16 @@ public class MessagesCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("label", Description = "Add or remove labels on a message. Accepts label IDs or display names.")]
+    [Command("label", Description = "Add or remove labels on a message. Accepts label IDs or display names. Get message IDs from 'nr messages list'.")]
     public async Task LabelAsync(
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID. Get from 'nr messages list'.")] string id,
-        [Option("add", new[] { 'a' }, Description = "Label ID or name to add. Repeat for multiple.")] List<string>? add = null,
-        [Option("remove", new[] { 'r' }, Description = "Label ID or name to remove. Repeat for multiple.")] List<string>? remove = null)
+        [Option("add", Description = "Label ID or name to add. Repeat for multiple.")] List<string>? add = null,
+        [Option("remove", Description = "Label ID or name to remove. Repeat for multiple.")] List<string>? remove = null)
     {
         if ((add is null or { Count: 0 }) && (remove is null or { Count: 0 }))
             throw new NrException(ExitCodes.InvalidArguments,
-                "Provide at least one --add or --remove label.");
+                "No label change given. Use --add <label> and/or --remove <label>, repeatable.");
 
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
@@ -126,7 +137,7 @@ public class MessagesCommands
         if (removeIds is { Count: > 0 })
             parts.Add($"removed {string.Join(", ", remove!)}");
 
-        _output.WritePlain($"Message {id}: {string.Join("; ", parts)}.");
+        _output.WritePlain($"Updated message {id}: {string.Join("; ", parts)}.");
     }
 
     private async Task<List<string>?> ResolveLabelIdsAsync(Google.Apis.Gmail.v1.GmailService gmail, List<string>? labels)
@@ -144,17 +155,18 @@ public class MessagesCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("read", Description = "Read a single message by ID. Decodes body and lists attachments. Get IDs from 'nr messages list'.")]
+    [Command("read", Description = "Read one message: decoded body and attachment list. Get IDs from 'nr messages list'.")]
     public async Task ReadAsync(
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID. Get from 'nr messages list'.")] string id,
-        [Option("format", Description = "'full' (default): decoded body. 'metadata': headers only. 'raw': RFC 2822 bytes to stdout.")] string format = "full",
-        [Option("include-headers", Description = "Header names to include with --format metadata. Repeat for multiple. Default: From,To,Cc,Subject,Date,Message-ID.")] List<string>? includeHeaders = null)
+        [Option("format", Description = "Detail level: 'full' (default) decoded body; 'metadata' headers only; 'minimal' IDs and labels only; 'raw' RFC 2822 bytes to stdout.")] string format = "full",
+        [Option("include-headers", Description = "Header names to include with --format metadata. Comma-separated or repeated. Default: From,To,Cc,Subject,Date,Message-ID.")] List<string>? includeHeaders = null)
     {
         var ctx = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
+        format = ParamValidation.RequireOneOf(format, ReadFormats, "format");
 
-        var headerNames = includeHeaders is { Count: > 0 } ? includeHeaders.ToArray() : null;
+        var headerNames = ParamValidation.SplitList(includeHeaders);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
@@ -183,6 +195,16 @@ public class MessagesCommands
         }
 
         // Human-readable output
+        if (format == "minimal")
+        {
+            _output.WriteKeyValue([
+                ("ID", message.Id),
+                ("Thread", message.ThreadId),
+                ("Labels", string.Join(", ", message.LabelIds))
+            ], mode);
+            return;
+        }
+
         _output.WriteKeyValue([
             ("From", message.Headers.GetValueOrDefault("From", "")),
             ("To", message.Headers.GetValueOrDefault("To", "")),

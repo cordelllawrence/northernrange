@@ -37,13 +37,13 @@ public static class LlmDocGenerator
         { ("threads", "list"), typeof(ThreadListResult) },
         { ("threads", "read"), typeof(ThreadDetail) },
         { ("labels", "list"), typeof(LabelListResult) },
-        { ("labels", "info"), typeof(LabelDetail) },
+        { ("labels", "show"), typeof(LabelDetail) },
         { ("labels", "create"), typeof(LabelDetail) },
         { ("labels", "delete"), null },
         { ("attachments", "list"), typeof(AttachmentListResult) },
         { ("attachments", "download"), typeof(AttachmentDownloadResult) },
-        { ("send", "new"), typeof(SendResult) },
-        { ("send", "reply"), typeof(SendResult) },
+        { ("messages", "send"), typeof(SendResult) },
+        { ("messages", "reply"), typeof(SendResult) },
         { ("drafts", "list"), typeof(DraftListResult) },
         { ("drafts", "send"), typeof(SendResult) },
         { ("drafts", "delete"), null },
@@ -244,7 +244,8 @@ public static class LlmDocGenerator
         sb.AppendLine();
         sb.AppendLine("| Variable | Description |");
         sb.AppendLine("|---|---|");
-        sb.AppendLine("| `NR_JSON` | Set to `1` for JSON output. |");
+        sb.AppendLine("| `NR_JSON` | Set to `1`, `true`, or `yes` for JSON output. |");
+        sb.AppendLine("| `NR_ACCOUNT` | Account name; same as `--account`. |");
         sb.AppendLine("| `NR_DEFAULT_LABEL` | Override default label. |");
         sb.AppendLine("| `NR_MAX_RESULTS` | Override default max results. |");
         sb.AppendLine("| `NR_CREDENTIALS` | Override credentials path. |");

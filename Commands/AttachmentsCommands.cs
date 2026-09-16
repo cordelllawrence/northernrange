@@ -30,7 +30,7 @@ public class AttachmentsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List attachments in a message without downloading. Use --json to get attachment IDs.")]
+    [Command("list", Description = "List a message's attachments without downloading them. Use --json to get attachment IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID. Find messages with 'nr messages list -q \"has:attachment\"'.")] string messageId)
@@ -75,7 +75,7 @@ public class AttachmentsCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("download", Description = "Download an attachment to disk. Get attachment IDs from 'nr attachments list <id> --json'.")]
+    [Command("download", Description = "Download one attachment to disk. Get attachment IDs from 'nr attachments list <message-id> --json'.")]
     public async Task DownloadAsync(
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID containing the attachment.")] string messageId,
@@ -103,6 +103,6 @@ public class AttachmentsCommands
         }
 
         _output.WritePlain(
-            $"Downloaded {result.Filename} ({PlainTextRenderer.FormatSize(result.Size)}) to {result.OutputPath}");
+            $"Downloaded {result.Filename} ({PlainTextRenderer.FormatSize(result.Size)}) to {result.OutputPath}.");
     }
 }

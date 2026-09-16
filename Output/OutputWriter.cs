@@ -24,7 +24,7 @@ public class OutputWriter
 
     public OutputMode DetermineMode(GlobalOptions globals, AppConfig config)
     {
-        var envJson = Environment.GetEnvironmentVariable("NR_JSON") == "1";
+        var envJson = EnvVars.JsonRequested();
         if (globals.Json || config.DefaultOutputFormat == "json" || envJson)
             return OutputMode.Json;
         if (globals.Ui && !Console.IsOutputRedirected)

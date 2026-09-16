@@ -130,6 +130,10 @@ public class MessageService
         {
             req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Raw;
         }
+        else if (format == "minimal")
+        {
+            req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Minimal;
+        }
         else if (format == "metadata")
         {
             req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
@@ -170,7 +174,7 @@ public class MessageService
             var rawBytes = MimeParser.DecodeBase64Url(msg.Raw);
             body = new MessageBody("message/rfc822", System.Text.Encoding.UTF8.GetString(rawBytes));
         }
-        else if (format != "metadata")
+        else if (format == "full")
         {
             body = _mimeParser.ParseBody(msg.Payload);
             attachments = _mimeParser.ExtractAttachments(msg.Payload);

@@ -234,26 +234,3 @@ public class AccountResolverTests
         finally { File.Delete(path); }
     }
 }
-
-public class ParamValidationTests
-{
-    [Theory]
-    [InlineData(1)]
-    [InlineData(250)]
-    [InlineData(500)]
-    public void RequireRange_InRange_DoesNotThrow(int value)
-    {
-        ParamValidation.RequireRange(value, 1, 500, "max");  // no exception
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(501)]
-    [InlineData(-5)]
-    public void RequireRange_OutOfRange_ThrowsInvalidArguments(int value)
-    {
-        var ex = Assert.Throws<NrException>(() => ParamValidation.RequireRange(value, 1, 500, "max"));
-        Assert.Equal(ExitCodes.InvalidArguments, ex.ExitCode);
-        Assert.Contains("max", ex.Message);
-    }
-}

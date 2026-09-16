@@ -44,10 +44,10 @@ public class NrHelpRenderer : ICoconaHelpRenderer
         sb.AppendLine("  --credentials <path>      Path to client_secrets.json");
         sb.AppendLine("  --config <path>           Path to config.json");
         sb.AppendLine("  --account <name>          Account name to use (overrides NR_ACCOUNT and config)");
-        sb.AppendLine("  --log                     Enable JSONL debug logging to a timestamped file");
-        sb.AppendLine("  --log-flat                Enable structured text logging to a timestamped file");
-        sb.AppendLine("  --log-file <path>         Write log to this path (appends if exists)");
-        sb.AppendLine("  --log-level <level>       Minimum log level (verbose|debug|information|warning|error)");
+        sb.AppendLine("  --log                     Write a log file (nr-YYYYMMDD.jsonl or .log) in the current directory");
+        sb.AppendLine("  --log-format <fmt>        Log file format: jsonl (default) or text");
+        sb.AppendLine("  --log-file <path>         Write the log to this path instead (appends; implies --log)");
+        sb.AppendLine("  --log-level <level>       Minimum log level (verbose|debug|information|warning|error|fatal)");
         sb.AppendLine();
         sb.AppendLine("Documentation:");
         sb.AppendLine("  --llm                     Print concise AI-consumable documentation (Markdown)");

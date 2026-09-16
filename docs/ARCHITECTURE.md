@@ -47,7 +47,7 @@ nr
 
 Plus process-level flags handled before the command pipeline:
 `--llm` / `--llm-full` (self-documentation) and the logging flags
-`--log` / `--log-flat` / `--log-file` / `--log-level`.
+`--log` / `--log-format` / `--log-file` / `--log-level`.
 
 Global options (every command): `--json`, `--ui`, `-v/--verbose`,
 `--credentials`, `--config`, `--account`, and the logging flags.
@@ -156,7 +156,7 @@ Google's endpoint, then deletes the local token regardless of revocation outcome
 - **Logging**: Serilog → a daily rolling file under the config dir
   (7-day retention) is always on at `Information`. `--verbose` adds a stderr
   console sink at `Debug`. `--log` / `--log-file` write agent-readable **JSONL**
-  (`JsonlLogFormatter`); `--log-flat` writes structured text. Tokens, secrets,
+  (`JsonlLogFormatter`); `--log-format text` writes structured text. Tokens, secrets,
   and message bodies are never logged.
 
 ---

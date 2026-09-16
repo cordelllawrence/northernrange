@@ -1,59 +1,39 @@
 using Cocona;
-using Microsoft.Extensions.Logging;
-using NorthernRange.Config;
 using NorthernRange.Errors;
 using NorthernRange.Filters;
-using NorthernRange.Gmail;
 using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
 
-public class SendCommands
+/// <summary>
+/// <c>nr messages send</c> and <c>nr messages reply</c>.
+/// </summary>
+public partial class MessagesCommands
 {
-    private readonly GmailClientFactory _gmailFactory;
-    private readonly SendService _sendService;
-    private readonly AccountResolver _resolver;
-    private readonly OutputWriter _output;
-    private readonly ILogger<SendCommands> _logger;
-
-    public SendCommands(
-        GmailClientFactory gmailFactory,
-        SendService sendService,
-        AccountResolver resolver,
-        OutputWriter output,
-        ILogger<SendCommands> logger)
-    {
-        _gmailFactory = gmailFactory;
-        _sendService  = sendService;
-        _resolver     = resolver;
-        _output       = output;
-        _logger       = logger;
-    }
-
     [ErrorHandlingFilter]
-    [Command("new", Description = "Compose and send a new message. Body from --body, --body-file, or stdin. Use --draft to save instead.")]
-    public async Task NewAsync(
+    [Command("send", Description = "Compose and send a new message. Body from --body, --body-file, or stdin. Use --draft to save instead of sending.")]
+    public async Task SendAsync(
         GlobalOptions globals,
         [Option('t', Description = "Recipient address. Repeat for multiple. Required.")] List<string>? to = null,
         [Option('c', Description = "CC address. Repeat for multiple.")] List<string>? cc = null,
         [Option("bcc", Description = "BCC address. Repeat for multiple.")] List<string>? bcc = null,
         [Option('s', Description = "Subject line. Required.")] string subject = "",
-        [Option("body", Description = "Body text inline. Falls back to --body-file then stdin if omitted.")] string? body = null,
+        [Option("body", Description = "Body text inline. Falls back to --body-file, then stdin.")] string? body = null,
         [Option("body-file", Description = "Path to a plain-text file whose contents become the body.")] string? bodyFile = null,
         [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
-        [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
+        [Option("draft", Description = "Save as a draft instead of sending.")] bool draft = false)
     {
         if (to is null || to.Count == 0)
-            throw new NrException(ExitCodes.InvalidArguments, "At least one --to / -t recipient is required.");
+            throw new NrException(ExitCodes.InvalidArguments, "No recipient given. Use --to <address>, repeatable.");
         if (string.IsNullOrWhiteSpace(subject))
-            throw new NrException(ExitCodes.InvalidArguments, "--subject / -s is required.");
+            throw new NrException(ExitCodes.InvalidArguments, "No subject given. Use --subject <text>.");
 
         var ctx  = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            ["Command"] = "send.new",
+            ["Command"] = "messages.send",
             ["To"]      = string.Join(", ", to)
         });
 
@@ -68,29 +48,28 @@ public class SendCommands
             return;
         }
 
-        if (result.IsDraft)
-            _output.WritePlain($"Draft saved.  Draft-ID: {result.DraftId}");
-        else
-            _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
+        _output.WritePlain(result.IsDraft
+            ? $"Saved draft {result.DraftId}."
+            : $"Sent message {result.MessageId} (thread {result.ThreadId}).");
     }
 
     [ErrorHandlingFilter]
-    [Command("reply", Description = "Reply to an existing message. Threading headers set automatically. Get IDs from 'nr messages list'.")]
+    [Command("reply", Description = "Reply to a message. Subject and threading headers are set automatically. Use --draft to save instead of sending. Get IDs from 'nr messages list'.")]
     public async Task ReplyAsync(
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID to reply to. Get from 'nr messages list'.")] string messageId,
-        [Option("body", Description = "Reply body text. Falls back to --body-file then stdin if omitted.")] string? body = null,
+        [Option("body", Description = "Reply body text. Falls back to --body-file, then stdin.")] string? body = null,
         [Option("body-file", Description = "Path to a plain-text file whose contents become the reply body.")] string? bodyFile = null,
         [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
         [Option("reply-all", Description = "CC all original recipients (To + Cc) in addition to the sender.")] bool replyAll = false,
-        [Option("draft", Description = "Save as a draft instead of sending immediately.")] bool draft = false)
+        [Option("draft", Description = "Save as a draft instead of sending.")] bool draft = false)
     {
         var ctx  = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);
 
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
-            ["Command"]   = "send.reply",
+            ["Command"]   = "messages.reply",
             ["MessageId"] = messageId
         });
 
@@ -105,13 +84,12 @@ public class SendCommands
             return;
         }
 
-        if (result.IsDraft)
-            _output.WritePlain($"Draft saved.  Draft-ID: {result.DraftId}");
-        else
-            _output.WritePlain($"Sent.  Message-ID: {result.MessageId}  Thread: {result.ThreadId}");
+        _output.WritePlain(result.IsDraft
+            ? $"Saved draft {result.DraftId}."
+            : $"Sent message {result.MessageId} (thread {result.ThreadId}).");
     }
 
-    // Resolves body text from --body, --body-file, or stdin (in that order).
+    // Resolves body text from --body-file, --body, or stdin (in that order).
     private static async Task<string> ResolveBodyAsync(string? body, string? bodyFile)
     {
         if (bodyFile is not null)
@@ -126,6 +104,6 @@ public class SendCommands
             return await Console.In.ReadToEndAsync();
         throw new NrException(
             ExitCodes.InvalidArguments,
-            "Body required: use --body, --body-file, or pipe content to stdin.");
+            "No body given. Use --body <text>, --body-file <path>, or pipe the body to stdin.");
     }
 }

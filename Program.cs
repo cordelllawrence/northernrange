@@ -21,17 +21,16 @@ try
 }
 catch (IOException) { /* redirected handle — encoding stays at the host default */ }
 
-// Pre-scan raw args for Serilog configuration before host builds
-var isVerbose = args.Any(a => a is "--verbose" or "-v");
-var isJson = args.Contains("--json") || Environment.GetEnvironmentVariable("NR_JSON") == "1";
+// Pre-scan raw args for Serilog configuration before the host exists. Flag
+// names must match GlobalOptions; ArgPrescan handles both "--x v" and "--x=v".
+var isVerbose = ArgPrescan.HasFlag(args, "--verbose", "-v");
+var isJson = ArgPrescan.HasFlag(args, "--json") || EnvVars.JsonRequested();
 
-// Pre-scan log flags
-var isLog = args.Contains("--log");
-var isLogFlat = args.Contains("--log-flat");
-var logFileIdx = Array.IndexOf(args, "--log-file");
-var logFile = logFileIdx >= 0 && logFileIdx + 1 < args.Length ? args[logFileIdx + 1] : null;
-var logLevelIdx = Array.IndexOf(args, "--log-level");
-var logLevelStr = logLevelIdx >= 0 && logLevelIdx + 1 < args.Length ? args[logLevelIdx + 1] : null;
+var logFile = ArgPrescan.GetValue(args, "--log-file");
+var isLog = ArgPrescan.HasFlag(args, "--log") || logFile is not null;
+var logFormat = (ArgPrescan.GetValue(args, "--log-format") ?? "jsonl").ToLowerInvariant();
+var isLogText = logFormat == "text";
+var logLevelStr = ArgPrescan.GetValue(args, "--log-level");
 
 // LLM documentation — handled before host build (no DI, no auth needed)
 var isLlm = args.Contains("--llm");
@@ -80,7 +79,7 @@ Log.Logger = new LoggerConfiguration()
             restrictedToMinimumLevel: LogEventLevel.Warning,
             outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}"))
     .WriteTo.Conditional(
-        _ => (isLog || logFile is not null) && !isLogFlat,
+        _ => isLog && !isLogText,
         wt => wt.File(
             formatter: new JsonlLogFormatter(),
             path: logFile ?? Path.Combine(Environment.CurrentDirectory, "nr-.jsonl"),
@@ -88,7 +87,7 @@ Log.Logger = new LoggerConfiguration()
             restrictedToMinimumLevel: ParseLogLevel(logLevelStr),
             shared: true))
     .WriteTo.Conditional(
-        _ => isLogFlat || (logFile is not null && isLogFlat),
+        _ => isLog && isLogText,
         wt => wt.File(
             path: logFile ?? Path.Combine(Environment.CurrentDirectory, "nr-.log"),
             rollingInterval: logFile is not null ? RollingInterval.Infinite : RollingInterval.Day,
@@ -99,9 +98,9 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    if (isLog || isLogFlat || logFile is not null)
+    if (isLog)
     {
-        var ext = isLogFlat ? ".log" : ".jsonl";
+        var ext = isLogText ? ".log" : ".jsonl";
         var resolvedPath = logFile ?? Path.GetFullPath($"nr-{DateTime.Now:yyyyMMdd}{ext}");
         Console.Error.WriteLine($"log: {resolvedPath}");
     }
