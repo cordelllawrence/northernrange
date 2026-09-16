@@ -146,7 +146,7 @@ or remove it from config and docs. Inert-but-documented config is misleading.
 ### Resilience
 
 **R1 — No 429/503 retry or backoff. (Medium)**
-`requirements.md §9.4` specifies exponential backoff via Google's
+`2026-03-02-requirements.md §9.4` specifies exponential backoff via Google's
 `ConfigurableBackOff`, but no initializer sets a backoff policy and there's no
 retry anywhere — under rate limiting the tool fails immediately with
 `ApiError(4)`. *Fix:* set `DefaultExponentialBackOffPolicy` on the
@@ -169,13 +169,13 @@ contract; wrap the input assignment defensively.
 
 ### Documentation drift (now fixed in this pass)
 
-- `requirements.md` stated scope `gmail.readonly`; actual is `gmail.modify`. ✔ annotated
-- `requirements.md` listed shipped features (send, drafts, labels, multi-account)
+- `2026-03-02-requirements.md` stated scope `gmail.readonly`; actual is `gmail.modify`. ✔ annotated
+- `2026-03-02-requirements.md` listed shipped features (send, drafts, labels, multi-account)
   as out-of-scope. ✔ annotated
-- `USAGE.md` exit-code table listed a phantom code `7`; only `6` exists. ✔ fixed
+- `../USAGE.md` exit-code table listed a phantom code `7`; only `6` exists. ✔ fixed
 - `README.md` opened by calling the tool "read-only". ✔ fixed
 - Minor: `northernrange.csproj` pins `Google.Apis.Gmail.v1` `1.68.0.3399`, while
-  `requirements.md §2` mentions `1.73.x`. Cosmetic; align if desired.
+  `2026-03-02-requirements.md §2` mentions `1.73.x`. Cosmetic; align if desired.
 
 ---
 

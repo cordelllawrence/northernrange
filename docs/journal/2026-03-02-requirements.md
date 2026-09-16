@@ -8,8 +8,8 @@
 > (read-only, single account, `gmail.readonly`). The shipped tool (0.1.2-beta)
 > has moved beyond it: it requests **`gmail.modify`**, supports **multiple
 > accounts**, and can **send mail, manage drafts, and create/delete/apply
-> labels**. For the current state see `ARCHITECTURE.md`; for the user-facing
-> contract see `README.md` / `USAGE.md`. The sections below are preserved for
+> labels**. For the current state see `../ARCHITECTURE.md`; for the user-facing
+> contract see `../../README.md` / `../USAGE.md`. The sections below are preserved for
 > historical context, with inline ✅ *Shipped* / ⚠️ *Changed* notes where reality
 > now differs.
 

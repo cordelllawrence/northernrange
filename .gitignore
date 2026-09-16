@@ -20,5 +20,3 @@ logs/
 .vscode/
 .claude/
 *.user
-llm-documentation-plan.md
-requirements.md

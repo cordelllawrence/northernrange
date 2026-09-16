@@ -34,7 +34,7 @@ public class MessagesCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List messages. Returns ID, From, Subject, Date, and snippet. See USAGE.md for query syntax and examples.")]
+    [Command("list", Description = "List messages. Returns ID, From, Subject, Date, and snippet. See docs/USAGE.md for query syntax and examples.")]
     public async Task ListAsync(
         GlobalOptions globals,
         [Option('l', Description = "Filter by label ID or name (default: INBOX). Get user label IDs from 'nr labels list'.")] string? label = null,

@@ -607,3 +607,11 @@ messages read/unread, archiving, and moving are already achievable today via
 ## About the Name
 
 The name "Northern Range" is a play on [Himalaya](https://github.com/pimalaya/himalaya), a popular CLI email client. It is inspired by the Northern Range — the mountain range found in the northern part of the island of Trinidad in the twin island republic of Trinidad and Tobago, where this tool was developed. 😊
+
+---
+
+## Documentation
+
+- [docs/USAGE.md](docs/USAGE.md): every command, flag, and exit code.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the code is laid out and why.
+- [docs/journal/](docs/journal/): dated plans, reviews, and working notes.

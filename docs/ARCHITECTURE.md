@@ -4,13 +4,13 @@
 
 This document describes where the application actually is today — its command
 surface, internal structure, and the design decisions behind it. It is the
-"map" companion to the user-facing `README.md` / `USAGE.md` and the historical
-spec in `requirements.md`.
+"map" companion to the user-facing `../README.md` / `USAGE.md` and the historical
+spec in `journal/2026-03-02-requirements.md`.
 
-> **Status note:** The project began (see `requirements.md`) as a *read-only,
+> **Status note:** The project began (see `journal/2026-03-02-requirements.md`) as a *read-only,
 > single-account* Phase 1 client scoped to `gmail.readonly`. It has since grown
 > well past that. It now requests `gmail.modify`, supports multiple accounts,
-> and can send mail, manage drafts, and mutate labels. `requirements.md` is kept
+> and can send mail, manage drafts, and mutate labels. `journal/2026-03-02-requirements.md` is kept
 > as a historical record; this document reflects the shipped reality.
 
 ---
@@ -211,7 +211,7 @@ smoke tests rather than mocked unit tests.
 
 ## 11. Resolved review items & remaining gaps
 
-The findings in `CODE-REVIEW.md` have been **addressed**: the class-level
+The findings in `journal/2026-06-27-code-review.md` have been **addressed**: the class-level
 `ErrorHandlingFilter` (which Cocona silently ignored for nested commands, so all
 errors exited 1 with a stack trace) is now applied per-method; `threads list`
 resolves label names; `messages read --format raw` is binary-safe; the API error
