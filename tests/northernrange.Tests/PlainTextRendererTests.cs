@@ -32,6 +32,45 @@ public class PlainTextRendererTests
         Assert.Equal(0, PlainTextRenderer.DisplayWidth("‍"));
     }
 
+    [Theory]
+    [InlineData("﻿")]  // zero-width no-break space (BOM)
+    [InlineData("‌")]  // zero-width non-joiner
+    [InlineData("͏")]  // combining grapheme joiner
+    [InlineData("­")]  // soft hyphen
+    public void DisplayWidth_FormatAndCombiningChars_AreZeroWidth(string s)
+    {
+        // These appear in marketing-mail snippets and used to break table alignment.
+        Assert.Equal(0, PlainTextRenderer.DisplayWidth(s));
+        Assert.Equal(2, PlainTextRenderer.DisplayWidth("a" + s + "b"));
+    }
+
+    [Fact]
+    public void StripInvisible_RemovesFormatAndControlChars_KeepsAccents()
+    {
+        var s = "͏ ‌ ﻿ Keep é and 中 ​";
+        Assert.Equal("Keep é and 中", PlainTextRenderer.StripInvisible(s));
+    }
+
+    [Fact]
+    public void Truncate_StripsInvisibleChars_BeforeMeasuring()
+    {
+        var snippet = "﻿‌﻿‌﻿‌Hello world";
+        Assert.Equal("Hello world", PlainTextRenderer.Truncate(snippet, 11));
+    }
+
+    [Fact]
+    public void RenderTable_AlignsColumns_WithInvisibleCharsInCells()
+    {
+        List<string[]> rows =
+        [
+            ["1", PlainTextRenderer.Truncate("͏ ‌ ﻿ ͏ ‌ ﻿ Zoom Scheduler", 20)],
+            ["2", PlainTextRenderer.Truncate("plain snippet", 20)],
+        ];
+        var lines = PlainTextRenderer.RenderTable(["ID", "Snippet"], rows).Split('\n');
+        var widths = lines.Select(PlainTextRenderer.DisplayWidth).Distinct().ToList();
+        Assert.Single(widths);
+    }
+
     // ── Truncate ──────────────────────────────────────────────────────────
 
     [Theory]

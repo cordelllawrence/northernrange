@@ -104,9 +104,14 @@ learn from `--llm`, so every inconsistency here is a prompt-engineering tax.
 Goal: paging through a mailbox works the same in text and JSON mode, and it is
 covered by tests that run without a network.
 
-Reproduced on 2026-09-16 against a live mailbox (read-only):
+Reproduced on 2026-09-16 against a live mailbox (read-only). **Done 2026-09-16**
+(commit "Phase 1½: fix pagination"): `NextPageHint` rebuilds the command from
+the flags actually given; empty pages still print the hint; drafts keep Gmail's
+order; invisible characters are stripped from table cells. Services are now
+testable through `tests/Fakes/FakeGmail.cs` (in-memory HTTP behind the real
+Google client).
 
-- [ ] **(seed, confirmed)** The "Next page:" hint drops every other flag. After
+- [x] **(seed, confirmed)** The "Next page:" hint drops every other flag. After
       `nr messages list -q "in:anywhere" -n 2`, the hint is
       `nr messages list --page-token <tok>`. Gmail does **not** reject the token; it
       continues from the cursor but under the *new* filter (default label, no query,
@@ -115,22 +120,23 @@ Reproduced on 2026-09-16 against a live mailbox (read-only):
       `drafts list`. Fix: the hint must echo `--label`, `--query`, `--max`,
       `--format`, and `--account` exactly as given, or the JSON result must carry a
       ready-made `nextCommand` field and the hint print that.
-- [ ] **(seed)** An empty page with a `nextPageToken` ends paging silently in text
+- [x] **(seed)** An empty page with a `nextPageToken` ends paging silently in text
       mode. All three list commands print "No … found." and return before the hint
       line. Gmail does return empty pages with a token when a label filter and a
       query are combined. JSON mode is unaffected. Fix: print the hint whenever a
       token is present, and say "No results on this page" rather than "No messages
       found".
-- [ ] **(seed)** `drafts list` sorts each page by date descending *within the page*.
+- [x] **(seed)** `drafts list` sorts each page by date descending *within the page*.
       Across pages the order is Gmail's, so page boundaries can interleave. Either
       drop the client-side sort or document it as per-page.
-- [ ] **(seed)** Snippets containing zero-width and format characters (U+034F,
+- [x] **(seed)** Snippets containing zero-width and format characters (U+034F,
       U+200C, U+FEFF, seen in marketing mail) break table column alignment. Strip
       Unicode categories Cf and Mn before truncation in `PlainTextRenderer`.
-- [ ] Token round-trip: tokens are 20-digit strings. Confirm Cocona never coerces
-      them, and that `--page-token=<tok>` (equals form) works.
-- [ ] `--max` above Gmail's page cap: does Gmail clamp silently, and does the tool
-      surface `resultSizeEstimate` truthfully?
+- [x] Token round-trip: tokens are 20-digit strings. Cocona keeps them as strings,
+      and `--page-token=<tok>` (equals form) works (verified live).
+- [x] `--max` above Gmail's page cap: rejected at 501 with exit 2 before any
+      request; Gmail's own cap is also 500. `resultSizeEstimate` is passed through
+      unchanged.
 
 Test approach (no interfaces needed): construct `GmailService` with a
 `BaseClientService.Initializer` whose `HttpClientFactory` returns a fake
@@ -323,9 +329,9 @@ Current coverage, by source file, from the 87 tests:
 | `Output/Llm*Generator` | markdown, filter, JSON schema | schema vs real output equivalence |
 | `Config/*` | loader, env precedence, resolver, persister | `Save` round-trip preserving unknown keys, macOS paths |
 | `Gmail/GmailErrorMapper` | mapping | — |
-| `Gmail/SendService` | `BuildReplyFields` only | `ListDraftsAsync`, `SendNewAsync`, MIME building, attachments |
-| `Gmail/MessageService` | none | `ListAsync` paging, `GetAsync` formats, `GetRawAsync`, `ModifyLabelsAsync`, concurrency cap |
-| `Gmail/ThreadService` | none | `ListAsync`, `GetAsync` |
+| `Gmail/SendService` | `BuildReplyFields`, `ListDraftsAsync` paging | `SendNewAsync`, MIME building, attachments |
+| `Gmail/MessageService` | `ListAsync` paging and formats | `GetAsync` formats, `GetRawAsync`, `ModifyLabelsAsync`, concurrency cap |
+| `Gmail/ThreadService` | `ListAsync` paging | `GetAsync` |
 | `Gmail/LabelService` | none | `IsLikelyLabelId`, name resolution, ambiguous names, delete fallback |
 | `Gmail/AttachmentService` | none | output path rules, `--force`, directory vs file, exit 6 paths |
 | `Gmail/GmailClientFactory` | none | timeout applied, backoff policy set |

@@ -164,12 +164,14 @@ public class SendService
         if (listResp.Drafts is null || listResp.Drafts.Count == 0)
             return new DraftListResult([], listResp.NextPageToken, listResp.ResultSizeEstimate ?? 0);
 
-        // Fetch metadata for each draft in parallel
+        // Fetch metadata for each draft in parallel. Task.WhenAll preserves the
+        // input order, and the list keeps Gmail's order: re-sorting inside a
+        // page would interleave with the next page's order.
         var summaries = await Task.WhenAll(listResp.Drafts.Select(d =>
             FetchDraftSummaryAsync(gmail, d.Id, ct)));
 
         return new DraftListResult(
-            [.. summaries.OrderByDescending(s => s.Date ?? DateTimeOffset.MinValue)],
+            [.. summaries],
             listResp.NextPageToken,
             listResp.ResultSizeEstimate ?? summaries.Length);
     }

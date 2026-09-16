@@ -74,26 +74,31 @@ public partial class MessagesCommands
             return;
         }
 
+        // Gmail can return an empty page that still carries a token, so the
+        // hint is printed whenever a token exists, not only after a table.
         if (result.Messages.Count == 0)
         {
-            _output.WritePlain("No messages found.");
-            return;
+            _output.WritePlain(result.NextPageToken is null ? "No messages found." : "No messages on this page.");
+        }
+        else
+        {
+            var headers = new[] { "ID", "From", "Subject", "Date", "Snippet" };
+            var rows = result.Messages.Select(m => new[]
+            {
+                m.Id,
+                PlainTextRenderer.Truncate(m.From, 30),
+                PlainTextRenderer.Truncate(m.Subject, 40),
+                PlainTextRenderer.FormatDate(m.Date, ctx.Config.DateFormat),
+                PlainTextRenderer.Truncate(m.Snippet, 60)
+            }).ToList();
+
+            _output.WriteTable(headers, rows, mode);
         }
 
-        var headers = new[] { "ID", "From", "Subject", "Date", "Snippet" };
-        var rows = result.Messages.Select(m => new[]
-        {
-            m.Id,
-            PlainTextRenderer.Truncate(m.From, 30),
-            PlainTextRenderer.Truncate(m.Subject, 40),
-            PlainTextRenderer.FormatDate(m.Date, ctx.Config.DateFormat),
-            PlainTextRenderer.Truncate(m.Snippet, 60)
-        }).ToList();
-
-        _output.WriteTable(headers, rows, mode);
-
         if (!string.IsNullOrEmpty(result.NextPageToken))
-            _output.WritePlain($"Next page: nr messages list --page-token {result.NextPageToken}");
+            _output.WritePlain(NextPageHint.Build("messages list", result.NextPageToken, globals,
+                ("--label", label), ("--query", query), ("--max", max?.ToString()),
+                ("--format", format == "metadata" ? null : format)));
     }
 
     [ErrorHandlingFilter]
@@ -199,7 +204,7 @@ public partial class MessagesCommands
         {
             _output.WriteKeyValue([
                 ("ID", message.Id),
-                ("Thread", message.ThreadId),
+                ("Thread", message.ThreadId ?? ""),
                 ("Labels", string.Join(", ", message.LabelIds))
             ], mode);
             return;

@@ -298,7 +298,7 @@ nr messages reply <id> --body "WIP reply" --draft
 
 ### `nr drafts list`
 
-List saved drafts sorted newest-first. Shows Draft ID, date, recipient, and subject.
+List saved drafts in Gmail's order. Shows Draft ID, date, recipient, and subject. When more results exist, prints a `Next page:` hint with the exact command to continue.
 
 ```
 nr drafts list

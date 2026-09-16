@@ -30,7 +30,7 @@ public class DraftCommands
     }
 
     [ErrorHandlingFilter]
-    [Command("list", Description = "List saved drafts, newest first. Use --json to get draft IDs.")]
+    [Command("list", Description = "List saved drafts in Gmail's order. Use --json to get draft IDs.")]
     public async Task ListAsync(
         GlobalOptions globals,
         [Option('n', Description = "Max drafts to return (1-500). Default: 25.")] int max = 25,
@@ -51,27 +51,31 @@ public class DraftCommands
             return;
         }
 
+        // Gmail can return an empty page that still carries a token, so the
+        // hint is printed whenever a token exists, not only after a table.
         if (result.Drafts.Count == 0)
         {
-            _output.WritePlain("No drafts found.");
-            return;
+            _output.WritePlain(result.NextPageToken is null ? "No drafts found." : "No drafts on this page.");
+        }
+        else
+        {
+            var dateFormat = ctx.Config.DateFormat;
+            var headers    = new[] { "Draft ID", "Date", "To", "Subject", "Snippet" };
+            var rows = result.Drafts.Select(d => new[]
+            {
+                d.DraftId,
+                PlainTextRenderer.FormatDate(d.Date, dateFormat),
+                PlainTextRenderer.Truncate(d.To, 30),
+                PlainTextRenderer.Truncate(d.Subject, 40),
+                PlainTextRenderer.Truncate(d.Snippet, 45)
+            }).ToList();
+
+            _output.WriteTable(headers, rows, mode);
         }
 
-        var dateFormat = ctx.Config.DateFormat;
-        var headers    = new[] { "Draft ID", "Date", "To", "Subject", "Snippet" };
-        var rows = result.Drafts.Select(d => new[]
-        {
-            d.DraftId,
-            PlainTextRenderer.FormatDate(d.Date, dateFormat),
-            PlainTextRenderer.Truncate(d.To, 30),
-            PlainTextRenderer.Truncate(d.Subject, 40),
-            PlainTextRenderer.Truncate(d.Snippet, 45)
-        }).ToList();
-
-        _output.WriteTable(headers, rows, mode);
-
         if (!string.IsNullOrEmpty(result.NextPageToken))
-            _output.WritePlain($"Next page: nr drafts list --page-token {result.NextPageToken}");
+            _output.WritePlain(NextPageHint.Build("drafts list", result.NextPageToken, globals,
+                ("--max", max == 25 ? null : max.ToString())));
     }
 
     [ErrorHandlingFilter]

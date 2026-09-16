@@ -54,11 +54,17 @@ public static class PlainTextRenderer
 
     private static int RuneWidth(int cp)
     {
-        // Zero-width: C0/C1 controls, combining diacritics, variation selectors, ZWJ etc.
-        if (cp is <= 0x1F or (>= 0x7F and <= 0x9F)) return 0;
-        if (cp is >= 0x0300 and <= 0x036F) return 0;    // Combining diacritical marks
+        // Zero-width: controls, format characters (ZWJ, ZWNJ, BOM, soft hyphen,
+        // bidi marks …), and non-spacing / enclosing combining marks.
+        switch (Rune.GetUnicodeCategory(new Rune(cp)))
+        {
+            case System.Globalization.UnicodeCategory.Control:
+            case System.Globalization.UnicodeCategory.Format:
+            case System.Globalization.UnicodeCategory.NonSpacingMark:
+            case System.Globalization.UnicodeCategory.EnclosingMark:
+                return 0;
+        }
         if (cp is >= 0xFE00 and <= 0xFE0F) return 0;    // Variation selectors
-        if (cp is >= 0x200B and <= 0x200F) return 0;    // Zero-width space/joiners
 
         // Wide (2 columns): emoji, CJK, Hangul, fullwidth forms
         if (cp is (>= 0x1100 and <= 0x115F)            // Hangul Jamo
@@ -97,10 +103,42 @@ public static class PlainTextRenderer
         return 1;
     }
 
+    /// <summary>
+    /// Shortens text for a table cell. Invisible format and control characters
+    /// (common in marketing-mail snippets: U+200C, U+FEFF, U+00AD …) are removed
+    /// first so they neither count toward the limit nor break column alignment.
+    /// </summary>
     public static string Truncate(string? text, int maxLength)
     {
         if (string.IsNullOrEmpty(text)) return "";
+        text = StripInvisible(text);
         return text.Length <= maxLength ? text : text[..(maxLength - 3)] + "...";
+    }
+
+    /// <summary>
+    /// Removes Unicode Format (Cf) and Control (Cc) characters plus the
+    /// combining grapheme joiner (U+034F, a Mark that renders nothing), collapses
+    /// runs of whitespace to one space, and trims. Real combining accents are kept.
+    /// </summary>
+    public static string StripInvisible(string text)
+    {
+        var sb = new StringBuilder(text.Length);
+        var pendingSpace = false;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            var cat = Rune.GetUnicodeCategory(rune);
+            if (cat is System.Globalization.UnicodeCategory.Format or System.Globalization.UnicodeCategory.Control
+                || rune.Value == 0x034F)
+                continue;
+            if (Rune.IsWhiteSpace(rune))
+            {
+                pendingSpace = sb.Length > 0;
+                continue;
+            }
+            if (pendingSpace) { sb.Append(' '); pendingSpace = false; }
+            sb.Append(rune.ToString());
+        }
+        return sb.ToString();
     }
 
     public static string FormatSize(long bytes)

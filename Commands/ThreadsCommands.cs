@@ -63,24 +63,28 @@ public class ThreadsCommands
             return;
         }
 
+        // Gmail can return an empty page that still carries a token, so the
+        // hint is printed whenever a token exists, not only after a table.
         if (result.Threads.Count == 0)
         {
-            _output.WritePlain("No threads found.");
-            return;
+            _output.WritePlain(result.NextPageToken is null ? "No threads found." : "No threads on this page.");
+        }
+        else
+        {
+            var headers = new[] { "ID", "Messages", "Snippet" };
+            var rows = result.Threads.Select(t => new[]
+            {
+                t.Id,
+                t.MessageCount?.ToString() ?? "-",
+                PlainTextRenderer.Truncate(t.Snippet, 80)
+            }).ToList();
+
+            _output.WriteTable(headers, rows, mode);
         }
 
-        var headers = new[] { "ID", "Messages", "Snippet" };
-        var rows = result.Threads.Select(t => new[]
-        {
-            t.Id,
-            t.MessageCount?.ToString() ?? "-",
-            PlainTextRenderer.Truncate(t.Snippet, 80)
-        }).ToList();
-
-        _output.WriteTable(headers, rows, mode);
-
         if (!string.IsNullOrEmpty(result.NextPageToken))
-            _output.WritePlain($"Next page: nr threads list --page-token {result.NextPageToken}");
+            _output.WritePlain(NextPageHint.Build("threads list", result.NextPageToken, globals,
+                ("--label", label), ("--query", query), ("--max", max?.ToString())));
     }
 
     [ErrorHandlingFilter]
