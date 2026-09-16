@@ -75,9 +75,10 @@ learn from `--llm`, so every inconsistency here is a prompt-engineering tax.
       Decide the canonical set and which commands support which.
 - [x] **(seed)** `--include-headers` is documented as comma-separated in `docs/USAGE.md`
       but implemented as a repeatable option. Pick one, or support both.
-- [ ] **(seed)** `--to` and `--subject` are documented "Required" but declared optional
+- [x] **(seed)** `--to` and `--subject` are documented "Required" but declared optional
       with manual validation, so `--help` and the `--llm` schema show them as
       optional. Make Cocona enforce it so the generated docs are truthful.
+      (Done in Phase 2 once binder errors mapped to exit 2.)
 - [x] Case sensitivity of enum-like values (`--format RAW`, `--log-level DEBUG`).
 - [x] `--log-level` accepts `fatal` in code but the help text does not list it.
 - [x] `NR_JSON` only accepts `1`. Accept `true`/`yes` too, or document strictly.
@@ -149,60 +150,66 @@ clients and unlocks tests for every service in Phase 4.
 
 ## Phase 2 — Contracts: exit codes, JSON shape, stdout/stderr
 
+**Done 2026-09-16** (commit "Phase 2: exit-code and JSON contract"). Decisions and
+outcomes: `2026-09-16-phase-2-contracts.md`. Also found and fixed while here: global
+options were only accepted *after* the subcommand, and `--help` exited 129. The
+`--to` / `--subject` item deferred from Phase 1 is done (required at the parser).
+Still open: `--ui` auto-disable on redirected stdout is verified on Windows only.
+
 Goal: the promises `README.md` makes to agents are true in every path, including
 the paths Cocona owns before our code runs.
 
 ### 2a. Exit codes
 
-- [ ] **(seed)** Unknown option exits **129**, unknown command exits **1**, and a
+- [x] **(seed)** Unknown option exits **129**, unknown command exits **1**, and a
       non-numeric `--max` exits **1** with the message
       `Option 'max' requires Nullable\`1 value`. The documented contract is **2** for
       invalid arguments. These are Cocona's parse errors, thrown before
       `ErrorHandlingFilter` runs. Fix at the host level (custom parse-error handling
       or a top-level wrapper).
-- [ ] **(seed)** `--log-file=path` (equals syntax) exits 129 because the hand-rolled
+- [x] **(seed)** `--log-file=path` (equals syntax) exits 129 because the hand-rolled
       pre-scan in `Program.cs` only understands space-separated form.
-- [ ] `auth status` returns exit 3 when no account is authenticated. That uses an
+- [x] `auth status` returns exit 3 when no account is authenticated. That uses an
       error code for a successful query. Decide if that is intended (grep-friendly
       for scripts) and document it as a deliberate exception.
-- [ ] `Ctrl+C` / `OperationCanceledException`: what code does the process exit with?
-- [ ] Every `NrException` site: is the chosen code right? Build a table of
+- [x] `Ctrl+C` / `OperationCanceledException`: what code does the process exit with?
+- [x] Every `NrException` site: is the chosen code right? Build a table of
       (command, failure, expected code) and turn it into tests.
 
 ### 2b. JSON output contract
 
-- [ ] **(seed)** Errors in `--json` mode are plain text on stderr. Agents may want a
+- [x] **(seed)** Errors in `--json` mode are plain text on stderr. Agents may want a
       JSON error envelope (`{ "error": { "code": 3, "message": … } }`). Decide and
       document.
-- [ ] Every command has a JSON branch; confirm every branch emits exactly one JSON
+- [x] Every command has a JSON branch; confirm every branch emits exactly one JSON
       document and nothing else on stdout (no "Next page:" hints, no blank lines).
-- [ ] Field naming: camelCase everywhere, no nulls vs missing ambiguity (`Never`
+- [x] Field naming: camelCase everywhere, no nulls vs missing ambiguity (`Never`
       ignore condition is set; confirm that is what agents want).
-- [ ] Date/time fields: ISO-8601 with offset everywhere. Check `Date` in list results
+- [x] Date/time fields: ISO-8601 with offset everywhere. Check `Date` in list results
       vs `TokenExpiry`.
-- [ ] Anonymous objects (`new { deleted = true, id }`) used for delete results while
+- [x] Anonymous objects (`new { deleted = true, id }`) used for delete results while
       everything else uses records. Records give the `--llm` schema generator
       something to reflect on; anonymous types do not.
-- [ ] **(seed)** The `--llm` response-type map in `LlmDocGenerator` is hand-maintained
+- [x] **(seed)** The `--llm` response-type map in `LlmDocGenerator` is hand-maintained
       and already omits `labels delete` and `drafts delete`. Either derive it from an
       attribute on each command or add a test that every command has an entry.
-- [ ] `--llm --json` schema versus real output: add a test that serialises a sample
+- [x] `--llm --json` schema versus real output: add a test that serialises a sample
       of each result record and validates it against the generated schema.
 
 ### 2c. stdout / stderr / logging discipline
 
-- [ ] **(seed)** A file log is written to `%APPDATA%\northernrange\logs` on **every**
+- [x] **(seed)** A file log is written to `%APPDATA%\northernrange\logs` on **every**
       run, including `--help`, at Information level. `README.md` says "No local state"
       and lists only token, profile, and explicit log files. Either stop the
       always-on log, make it opt-in, or document it.
-- [ ] **(seed)** Information-level log lines include query strings, subjects, label
+- [x] **(seed)** Information-level log lines include query strings, subjects, label
       names, recipients, and email addresses. That is PII written to disk by default.
       Review what belongs at Information vs Debug.
-- [ ] `--verbose` output: confirm nothing secret (token, auth code, client secret) is
+- [x] `--verbose` output: confirm nothing secret (token, auth code, client secret) is
       ever logged at any level.
 - [ ] Redirected stdout with `--ui`: confirm auto-disable actually works on Windows
       and Linux.
-- [ ] `--ui` is "best-effort" (`WritePlain` and `WriteDivider` ignore mode). Either
+- [x] `--ui` is "best-effort" (`WritePlain` and `WriteDivider` ignore mode). Either
       finish it or document it as partial in `--help`.
 
 ---

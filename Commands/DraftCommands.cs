@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NorthernRange.Config;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
+using NorthernRange.Models;
 using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
@@ -125,7 +126,7 @@ public class DraftCommands
 
         if (mode == OutputMode.Json)
         {
-            _output.WriteJson(new { deleted = true, draftId });
+            _output.WriteJson(new DeleteResult(true, draftId));
             return;
         }
 

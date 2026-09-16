@@ -28,16 +28,12 @@ public static class AppPaths
     public static string GetTokenStorePath() =>
         Path.Combine(GetConfigDir(), "tokens");
 
-    public static string GetLogDir() =>
-        Path.Combine(GetConfigDir(), "logs");
-
     public static void EnsureDirectoriesExist()
     {
         var configDir = GetConfigDir();
-        var logDir = GetLogDir();
         var tokenDir = GetTokenStorePath();
 
-        foreach (var dir in new[] { configDir, logDir, tokenDir })
+        foreach (var dir in new[] { configDir, tokenDir })
         {
             if (!Directory.Exists(dir))
             {

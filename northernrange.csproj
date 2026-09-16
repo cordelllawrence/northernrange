@@ -7,15 +7,23 @@
     <Nullable>enable</Nullable>
     <AssemblyName>nr</AssemblyName>
     <RootNamespace>NorthernRange</RootNamespace>
-    <VersionPrefix>0.1.2</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>
     <VersionSuffix>beta</VersionSuffix>
-    <!-- Publish settings: single-file, self-contained, partial trim -->
+    <!-- Suppress trim warnings: TrimMode=partial never trims NuGet assemblies or
+         this one (not marked IsTrimmable), so reflection over our own command
+         and model types (IL2070) and the framework's (IL2026/IL2104) is safe. -->
+    <NoWarn>$(NoWarn);IL2026;IL2070;IL2104</NoWarn>
+  </PropertyGroup>
+
+  <!-- Publish settings: single-file, self-contained, partial trim. Applied only
+       by `dotnet publish` so a plain `dotnet build` stays framework-dependent;
+       that keeps the binary runnable from the test project's output directory
+       (tests/ExitCodeE2ETests.cs launches it). -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
-    <!-- Suppress trim warnings: TrimMode=partial never trims NuGet assemblies, so IL2026/IL2104 are safe to ignore -->
-    <NoWarn>$(NoWarn);IL2026;IL2104</NoWarn>
     <PublishReadyToRun>true</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>

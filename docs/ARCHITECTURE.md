@@ -153,11 +153,17 @@ Google's endpoint, then deletes the local token regardless of revocation outcome
 - **Plain tables** are rendered by `PlainTextRenderer`, which computes
   **display width** rune-by-rune (CJK/emoji count as 2 columns) for correct
   alignment.
-- **Logging**: Serilog → a daily rolling file under the config dir
-  (7-day retention) is always on at `Information`. `--verbose` adds a stderr
-  console sink at `Debug`. `--log` / `--log-file` write agent-readable **JSONL**
-  (`JsonlLogFormatter`); `--log-format text` writes structured text. Tokens, secrets,
-  and message bodies are never logged.
+- **Logging**: Serilog. Nothing is written to disk unless asked: `--log` /
+  `--log-file` write agent-readable **JSONL** (`JsonlLogFormatter`) or, with
+  `--log-format text`, structured text. Warnings always reach stderr; `--verbose`
+  lowers that stderr sink to `Debug`. Tokens, secrets, and message bodies are
+  never logged; subjects, addresses and queries are (at `Information`).
+- **Errors** go through `ErrorOutput`: one stderr line, plain text or a JSON
+  envelope in JSON mode. `ErrorHandlingFilter` maps `NrException`, Cocona's
+  `ParameterBinderException` (exit 2) and cancellation (exit 130).
+  `NrDispatchPipeline` wraps Cocona's dispatch pipeline so unknown options exit
+  2 instead of Cocona's 129, and `Program` remaps Cocona's unknown-command exit
+  1 to 2.
 
 ---
 

@@ -26,7 +26,10 @@ public class OutputWriter
     {
         var envJson = EnvVars.JsonRequested();
         if (globals.Json || config.DefaultOutputFormat == "json" || envJson)
+        {
+            ErrorOutput.JsonMode = true; // config may have chosen JSON after the startup scan
             return OutputMode.Json;
+        }
         if (globals.Ui && !Console.IsOutputRedirected)
             return OutputMode.RichUi;
         if (globals.Ui && Console.IsOutputRedirected)

@@ -10,7 +10,7 @@ nr <command> [subcommand] [options]
 
 ## Global options
 
-Available on every command.
+Available on every command, before or after the subcommand: `nr --json messages list` and `nr messages list --json` are the same.
 
 | Option | Description |
 |---|---|
@@ -20,7 +20,7 @@ Available on every command.
 | `--credentials <path>` | Path to `client_secrets.json`. Overrides config and the default location. |
 | `--config <path>` | Path to `config.json`. Overrides the default location. |
 | `--account <name>` | Account name to use. Overrides `NR_ACCOUNT` env var and config `defaultAccount`. Default: `"default"`. |
-| `--log` | Write a log file in the current directory: `nr-YYYYMMDD.jsonl` (or `.log` with `--log-format text`). |
+| `--log` | Write a log file in the current directory: `nr-YYYYMMDD.jsonl` (or `.log` with `--log-format text`). Logs contain message metadata (subjects, addresses, queries) but never bodies, tokens, or secrets. Nothing is logged to disk without this flag. |
 | `--log-format <fmt>` | Log file format: `jsonl` (default) or `text`. |
 | `--log-file <path>` | Write the log to this path instead (appends if it exists). Implies `--log`. |
 | `--log-level <level>` | Minimum log level: `verbose`, `debug`, `information` (default), `warning`, `error`, `fatal`. |
@@ -342,3 +342,12 @@ nr drafts delete r8234567890123456
 | 4 | API error |
 | 5 | Not found |
 | 6 | File error (output exists without `--force`, unwritable path, missing/unreadable input file) |
+| 130 | Cancelled (Ctrl+C) |
+
+Errors are written to stderr, never stdout, so stdout can always be parsed. In `--json` mode the stderr line is a JSON envelope:
+
+```json
+{"error":{"code":2,"message":"--format must be one of: full, metadata, minimal, raw (got 'bogus')."}}
+```
+
+Anything wrong on the command line exits 2: an unknown command, an unknown option, a missing required option, or a value that cannot be converted. `auth status` exits 3 when no account is authenticated; that is a deliberate query result so scripts can branch on it, not a failure.

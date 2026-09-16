@@ -14,19 +14,19 @@ public partial class MessagesCommands
     [Command("send", Description = "Compose and send a new message. Body from --body, --body-file, or stdin. Use --draft to save instead of sending.")]
     public async Task SendAsync(
         GlobalOptions globals,
-        [Option('t', Description = "Recipient address. Repeat for multiple. Required.")] List<string>? to = null,
+        [Option('t', Description = "Recipient address. Repeat for multiple.")] List<string> to,
+        [Option('s', Description = "Subject line.")] string subject,
         [Option('c', Description = "CC address. Repeat for multiple.")] List<string>? cc = null,
         [Option("bcc", Description = "BCC address. Repeat for multiple.")] List<string>? bcc = null,
-        [Option('s', Description = "Subject line. Required.")] string subject = "",
         [Option("body", Description = "Body text inline. Falls back to --body-file, then stdin.")] string? body = null,
         [Option("body-file", Description = "Path to a plain-text file whose contents become the body.")] string? bodyFile = null,
         [Option('a', Description = "Path to a local file to attach. Repeat for multiple.")] List<string>? attach = null,
         [Option("draft", Description = "Save as a draft instead of sending.")] bool draft = false)
     {
-        if (to is null || to.Count == 0)
-            throw new NrException(ExitCodes.InvalidArguments, "No recipient given. Use --to <address>, repeatable.");
+        // --to and --subject are required at the parser level, so --help and
+        // the --llm schema show them as required. Cocona still allows -s "".
         if (string.IsNullOrWhiteSpace(subject))
-            throw new NrException(ExitCodes.InvalidArguments, "No subject given. Use --subject <text>.");
+            throw new NrException(ExitCodes.InvalidArguments, "Subject is empty. Use --subject <text>.");
 
         var ctx  = _resolver.Resolve(globals);
         var mode = _output.DetermineMode(globals, ctx.Config);

@@ -13,7 +13,7 @@ Most Gmail tools are built around interactive UIs. `nr` is built around the oppo
 - **Headless-first.** `--json` output is a stable contract. Agents and scripts can depend on it.
 - **Self-documenting.** `nr --llm` (and `--llm-full` / `--llm --json`) emits AI-consumable docs generated from the live command tree, so an agent can learn the CLI before using it.
 - **Safe by default.** Reads need no extra intent; sending, drafts, and label changes are explicit, separate commands. Permanent deletion of mail is intentionally not supported.
-- **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token, a small cached profile (`user_info.json`), and log files (plus whatever you explicitly `attachments download`).
+- **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token and a small cached profile (`user_info.json`), plus whatever you explicitly ask for with `--log` or `attachments download`.
 - **Composable.** List commands produce paginated JSON with `nextPageToken`. Output is pipe-friendly.
 - **Self-contained binary.** A single executable with no .NET runtime installation required on the target machine.
 
@@ -530,6 +530,7 @@ nr messages read <id> --format raw | some-other-tool
 | `4` | Gmail API error |
 | `5` | Resource not found (message, thread, label) |
 | `6` | File write error (e.g. file exists, use `--force`) |
+| `130` | Cancelled (Ctrl+C) |
 
 Errors always go to **stderr** as plain text. **stdout** contains only the command's output (JSON or plain text). This separation means scripts can safely parse stdout without filtering error messages.
 
@@ -579,14 +580,14 @@ The refresh token is long-lived. It survives indefinitely for Google Cloud proje
 
 ## Data Paths
 
-| Platform | Config | Tokens | Logs |
-|---|---|---|---|
-| Windows | `%APPDATA%\northernrange\` | `%APPDATA%\northernrange\tokens\<account>\` | `%APPDATA%\northernrange\logs\` |
-| macOS / Linux | `~/.config/northernrange/` | `~/.config/northernrange/tokens/<account>/` | `~/.config/northernrange/logs/` |
+| Platform | Config | Tokens |
+|---|---|---|
+| Windows | `%APPDATA%\northernrange\` | `%APPDATA%\northernrange\tokens\<account>\` |
+| macOS / Linux | `~/.config/northernrange/` | `~/.config/northernrange/tokens/<account>/` |
 
 Each account's tokens are stored in a separate subdirectory (e.g. `tokens/default/`, `tokens/work/`). Existing single-account installs are auto-migrated to `tokens/default/` on first run.
 
-Logs roll daily and are retained for 7 days. No email content is ever written to disk except when explicitly using `attachments download`.
+No log file is written unless you pass `--log` or `--log-file`; those go to the current directory (or the path you give). No email content is ever written to disk except when explicitly using `attachments download`.
 
 ---
 

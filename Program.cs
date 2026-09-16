@@ -7,6 +7,8 @@ using Serilog.Events;
 using NorthernRange.Auth;
 using NorthernRange.Commands;
 using NorthernRange.Config;
+using NorthernRange.Errors;
+using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Mime;
 using Cocona.Help;
@@ -25,6 +27,7 @@ catch (IOException) { /* redirected handle — encoding stays at the host defaul
 // names must match GlobalOptions; ArgPrescan handles both "--x v" and "--x=v".
 var isVerbose = ArgPrescan.HasFlag(args, "--verbose", "-v");
 var isJson = ArgPrescan.HasFlag(args, "--json") || EnvVars.JsonRequested();
+ErrorOutput.JsonMode = isJson;
 
 var logFile = ArgPrescan.GetValue(args, "--log-file");
 var isLog = ArgPrescan.HasFlag(args, "--log") || logFile is not null;
@@ -60,12 +63,8 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Google", LogEventLevel.Warning)
     .MinimumLevel.Override("System.Net.Http", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .WriteTo.File(
-        path: Path.Combine(AppPaths.GetLogDir(), "nr-.log"),
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 7,
-        restrictedToMinimumLevel: LogEventLevel.Information,
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}{NewLine}{Properties:j}{NewLine}")
+    // No always-on file sink: the tool writes nothing to disk unless asked
+    // (--log / --log-file). Warnings and errors still reach stderr below.
     .WriteTo.Conditional(
         _ => isVerbose && !isJson,
         wt => wt.Console(
@@ -108,6 +107,9 @@ try
     Log.Information("northernrange starting. Verbose={Verbose}, Json={Json}", isVerbose, isJson);
     Log.Debug("Config dir: {ConfigDir}", AppPaths.GetConfigDir());
 
+    // Let global options appear before the command as well as after it.
+    args = ArgPrescan.HoistGlobalOptions(args);
+
     await CoconaApp.CreateHostBuilder()
         .ConfigureLogging(lb =>
         {
@@ -129,13 +131,31 @@ try
             services.AddSingleton<OutputWriter>();
             services.AddSingleton<SendService>();
             services.AddSingleton<ICoconaHelpRenderer, NrHelpRenderer>();
+            NrDispatchPipeline.Register(services);
         })
         .RunAsync<NorthernRangeApp>(args);
+
+    // Cocona reports an unknown command as exit 1 before any command runs.
+    // The documented contract is 2 for anything wrong on the command line.
+    if (Environment.ExitCode == ExitCodes.GeneralError && !NrDispatchPipeline.Dispatched)
+        Environment.ExitCode = ExitCodes.InvalidArguments;
+
+    // Cocona exits 129 after printing help that was asked for. Help is a
+    // success. (Unknown options, Cocona's other 129, are handled by
+    // NrDispatchPipeline before this point.)
+    if (Environment.ExitCode == 129 && ArgPrescan.HasFlag(args, "--help", "-h"))
+        Environment.ExitCode = ExitCodes.Success;
 }
-catch (Exception ex) when (ex is not OperationCanceledException)
+catch (OperationCanceledException)
+{
+    ErrorOutput.Write(ExitCodes.Cancelled, "Cancelled.");
+    Environment.ExitCode = ExitCodes.Cancelled;
+}
+catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
-    Environment.Exit(1);
+    ErrorOutput.Write(ExitCodes.GeneralError, $"Unexpected error: {ex.Message}");
+    Environment.ExitCode = ExitCodes.GeneralError;
 }
 finally
 {

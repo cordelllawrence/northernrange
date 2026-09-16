@@ -4,6 +4,7 @@ using NorthernRange.Config;
 using NorthernRange.Errors;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
+using NorthernRange.Models;
 using NorthernRange.Output;
 
 namespace NorthernRange.Commands;
@@ -157,7 +158,7 @@ public class LabelsCommands
 
         if (mode == OutputMode.Json)
         {
-            _output.WriteJson(new { deleted = true, id });
+            _output.WriteJson(new DeleteResult(true, id));
             return;
         }
 

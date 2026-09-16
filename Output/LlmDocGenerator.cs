@@ -39,14 +39,14 @@ public static class LlmDocGenerator
         { ("labels", "list"), typeof(LabelListResult) },
         { ("labels", "show"), typeof(LabelDetail) },
         { ("labels", "create"), typeof(LabelDetail) },
-        { ("labels", "delete"), null },
+        { ("labels", "delete"), typeof(DeleteResult) },
         { ("attachments", "list"), typeof(AttachmentListResult) },
         { ("attachments", "download"), typeof(AttachmentDownloadResult) },
         { ("messages", "send"), typeof(SendResult) },
         { ("messages", "reply"), typeof(SendResult) },
         { ("drafts", "list"), typeof(DraftListResult) },
         { ("drafts", "send"), typeof(SendResult) },
-        { ("drafts", "delete"), null },
+        { ("drafts", "delete"), typeof(DeleteResult) },
     };
 
     // ── Public API ────────────────────────────────────────────────────
@@ -111,7 +111,9 @@ public static class LlmDocGenerator
         // Exit codes — single line
         sb.AppendLine("## Exit Codes");
         sb.AppendLine();
-        sb.AppendLine("0=Success, 1=Error, 2=InvalidArgs, 3=AuthRequired, 4=ApiError, 5=NotFound, 6=FileError");
+        sb.AppendLine("0=Success, 1=Error, 2=InvalidArgs, 3=AuthRequired, 4=ApiError, 5=NotFound, 6=FileError, 130=Cancelled");
+        sb.AppendLine();
+        sb.AppendLine("Errors go to stderr, never stdout. With `--json` they are `{\"error\":{\"code\":N,\"message\":\"…\"}}`.");
         sb.AppendLine();
 
         sb.AppendLine("Use `--json` on any command for machine-readable JSON output.");
@@ -266,6 +268,11 @@ public static class LlmDocGenerator
         sb.AppendLine("| 4 | API error |");
         sb.AppendLine("| 5 | Not found |");
         sb.AppendLine("| 6 | File error |");
+        sb.AppendLine("| 130 | Cancelled (Ctrl+C) |");
+        sb.AppendLine();
+        sb.AppendLine("Errors are written to stderr, never stdout. In `--json` mode the stderr line is");
+        sb.AppendLine("`{\"error\":{\"code\":N,\"message\":\"…\"}}`. `auth status` exits 3 when no account is");
+        sb.AppendLine("authenticated; that is a deliberate query result, not a failure.");
 
         return sb.ToString().TrimEnd();
     }
@@ -334,7 +341,9 @@ public static class LlmDocGenerator
                 ["4"] = "API error",
                 ["5"] = "Not found",
                 ["6"] = "File error",
+                ["130"] = "Cancelled (Ctrl+C)",
             },
+            ["errorOutput"] = "stderr; in --json mode a JSON envelope {\"error\":{\"code\":N,\"message\":\"...\"}}",
         };
 
         var jsonOptions = new JsonSerializerOptions

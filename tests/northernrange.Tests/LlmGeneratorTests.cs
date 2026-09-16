@@ -121,6 +121,51 @@ public class LlmDocGeneratorTests
     }
 
     [Fact]
+    public void JsonToolSchema_EveryCommandHasAResponseSchema()
+    {
+        // The response-type map in LlmDocGenerator is hand-maintained. A command
+        // without an entry silently documents nothing; this catches that drift.
+        using var doc = JsonDocument.Parse(LlmDocGenerator.GenerateJsonToolSchema());
+        var missing = doc.RootElement.GetProperty("commands").EnumerateArray()
+            .Where(c => !c.TryGetProperty("response", out var r) || r.ValueKind == JsonValueKind.Null)
+            .Select(c => c.GetProperty("name").GetString())
+            .ToList();
+
+        Assert.Empty(missing);
+    }
+
+    [Fact]
+    public void JsonToolSchema_ExitCodes_MatchExitCodesClass()
+    {
+        using var doc = JsonDocument.Parse(LlmDocGenerator.GenerateJsonToolSchema());
+        var documented = doc.RootElement.GetProperty("exitCodes").EnumerateObject()
+            .Select(p => int.Parse(p.Name)).OrderBy(x => x).ToList();
+        var actual = typeof(NorthernRange.Errors.ExitCodes).GetFields()
+            .Select(f => (int)f.GetRawConstantValue()!).OrderBy(x => x).ToList();
+
+        Assert.Equal(actual, documented);
+    }
+
+    [Theory]
+    [InlineData(typeof(MessageListResult))]
+    [InlineData(typeof(MessageDetail))]
+    [InlineData(typeof(LabelDetail))]
+    [InlineData(typeof(DeleteResult))]
+    [InlineData(typeof(SendResult))]
+    public void GenerateSchema_PropertyNames_MatchSerializedOutput(Type type)
+    {
+        // The schema is what agents read; the serializer is what they parse.
+        // Both must agree on camelCase property names.
+        var schema = LlmSchemaGenerator.GenerateSchema(type);
+        var schemaProps = Assert.IsType<Dictionary<string, object>>(schema["properties"]).Keys.OrderBy(k => k).ToList();
+
+        var serializerProps = type.GetProperties()
+            .Select(p => JsonNamingPolicy.CamelCase.ConvertName(p.Name)).OrderBy(k => k).ToList();
+
+        Assert.Equal(serializerProps, schemaProps);
+    }
+
+    [Fact]
     public void FullMarkdown_IncludesConfigAndSchemas()
     {
         var md = LlmDocGenerator.GenerateFullMarkdown();

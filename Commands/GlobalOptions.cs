@@ -6,7 +6,7 @@ public record GlobalOptions(
     [Option("json", Description = "Output machine-readable JSON to stdout. Also enabled by NR_JSON=1.")]
     bool Json = false,
 
-    [Option("ui", Description = "Enable Spectre.Console rich rendering (auto-disabled when stdout is redirected).")]
+    [Option("ui", Description = "Rich tables and key-value blocks on a terminal; body text stays plain. Ignored when stdout is redirected.")]
     bool Ui = false,
 
     [Option('v', Description = "Emit debug diagnostics to stderr. Never affects stdout.")]
