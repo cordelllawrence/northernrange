@@ -91,7 +91,7 @@ public class SendService
             var req = gmail.Users.Messages.Get("me", replyToMessageId);
             req.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
             req.MetadataHeaders = new Google.Apis.Util.Repeatable<string>(
-                ["From", "To", "Cc", "Subject", "Message-ID", "References"]);
+                ["From", "Reply-To", "To", "Cc", "Subject", "Message-ID", "References"]);
             original = await req.ExecuteAsync(ct);
         }
         catch (Google.GoogleApiException ex)
@@ -255,16 +255,19 @@ public class SendService
 
     /// <summary>
     /// Derives reply recipients, subject, and the References chain from the
-    /// original message's headers. The reply goes to the original sender; with
-    /// <paramref name="replyAll"/>, the original To + Cc become the new Cc. The
-    /// subject gains a single "Re: " prefix (not stacked), and the new
-    /// Message-ID is appended to any existing References chain.
+    /// original message's headers. The reply goes to the <c>Reply-To</c>
+    /// address if present, otherwise the <c>From</c> address (RFC 5322 §3.6.2).
+    /// With <paramref name="replyAll"/>, the original To + Cc become the new
+    /// Cc, with the primary recipient deduped out. The subject gains a single
+    /// "Re: " prefix (not stacked), and the new Message-ID is appended to any
+    /// existing References chain.
     /// </summary>
     internal static (List<string> To, List<string>? Cc, string Subject, string? References) BuildReplyFields(
         IReadOnlyDictionary<string, string> headers, bool replyAll)
     {
         headers.TryGetValue("Subject", out var origSubject);
         headers.TryGetValue("From", out var origFrom);
+        headers.TryGetValue("Reply-To", out var origReplyTo);
         headers.TryGetValue("To", out var origTo);
         headers.TryGetValue("Cc", out var origCc);
         headers.TryGetValue("Message-ID", out var origMessageId);
@@ -274,19 +277,26 @@ public class SendService
             ? origSubject
             : $"Re: {origSubject}";
 
-        // Reply-to is always the original sender.
+        // Primary recipient: Reply-To wins, From is the fallback. Mailing
+        // lists set Reply-To to route replies back to the list, not the sender.
+        var primary = !string.IsNullOrWhiteSpace(origReplyTo) ? origReplyTo : origFrom;
         var to = new List<string>();
-        if (!string.IsNullOrWhiteSpace(origFrom)) to.Add(origFrom);
+        if (!string.IsNullOrWhiteSpace(primary))
+            to.AddRange(SplitAddresses(primary));
 
-        // --reply-all CCs all original recipients (original To + Cc).
+        // --reply-all CCs all original recipients (original To + Cc), minus
+        // anyone already in To (dedup is address-only so display-name
+        // variations collapse).
         List<string>? cc = null;
         if (replyAll)
         {
             cc = [];
-            if (!string.IsNullOrWhiteSpace(origTo))
-                cc.AddRange(origTo.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
-            if (!string.IsNullOrWhiteSpace(origCc))
-                cc.AddRange(origCc.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()));
+            if (!string.IsNullOrWhiteSpace(origTo)) cc.AddRange(SplitAddresses(origTo));
+            if (!string.IsNullOrWhiteSpace(origCc)) cc.AddRange(SplitAddresses(origCc));
+
+            var toAddresses = to.Select(ExtractEmailAddress).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            cc = cc.Where(x => !toAddresses.Contains(ExtractEmailAddress(x))).ToList();
+            if (cc.Count == 0) cc = null;
         }
 
         // Append the original Message-ID to the References chain.
@@ -295,6 +305,23 @@ public class SendService
             : $"{origReferences} {origMessageId}";
 
         return (to, cc, replySubject, references);
+    }
+
+    private static IEnumerable<string> SplitAddresses(string value) =>
+        value.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim());
+
+    /// <summary>
+    /// Returns the bare email address from an RFC 5322 mailbox form.
+    /// "Alice &lt;a@x.com&gt;" → "a@x.com"; "a@x.com" → "a@x.com". No parsing
+    /// of groups or quoted locals — this is address-level dedup, not display.
+    /// </summary>
+    internal static string ExtractEmailAddress(string mailbox)
+    {
+        var lt = mailbox.LastIndexOf('<');
+        var gt = mailbox.LastIndexOf('>');
+        if (lt >= 0 && gt > lt)
+            return mailbox[(lt + 1)..gt].Trim();
+        return mailbox.Trim();
     }
 
     // ── MIME builder ─────────────────────────────────────────────────────────

@@ -75,7 +75,12 @@ public class MessageService
             listResp.ResultSizeEstimate ?? 0);
     }
 
-    private const int MaxConcurrentFetches = 10;
+    // Cap the per-list burst of metadata fetches. Gmail's per-user quota is
+    // generous (~250 msg/s) but a burst of 500 open requests still trips the
+    // underlying HTTP client's connection pool and makes the whole command
+    // slower than this bounded form. Not surfaced as config: the right value
+    // depends on the mailbox's rate-limit budget, which this tool cannot see.
+    internal const int MaxConcurrentFetches = 10;
 
     private async Task<List<MessageSummary>> FetchSummariesAsync(
         GmailService gmail, IList<Message> messages, CancellationToken ct)

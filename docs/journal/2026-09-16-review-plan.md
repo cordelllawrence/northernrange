@@ -282,24 +282,46 @@ Goal: the Gmail layer is correct, safe, and testable without a network.
 - [ ] Services are concrete classes taking a `GmailService` per call. No interface,
       so nothing at the command layer can be unit-tested. Decide: introduce
       `IGmailGateway`-style interfaces, or accept command-layer tests as integration
-      only.
+      only. **Open.** Deferred to Phase 5's architecture decision; the Phase 3
+      prelude extraction already localises the Gmail dependency behind
+      `CommandSession.GmailAsync()`, so a later swap is a smaller surgery than
+      it was.
 - [ ] `GmailClientFactory` cache + semaphore: keep or simplify (previous review said
       harmless; revisit once Phase 3 settles who owns the client).
 - [ ] 429 retry still not handled (known). Check whether the current Google.Apis
       version has a usable hook before deciding.
-- [ ] `LabelService.IsLikelyLabelId` heuristic: list the cases and test them
+- [x] `LabelService.IsLikelyLabelId` heuristic: list the cases and test them
       (`INBOX`, `Label_18`, `URGENT`, `CATEGORY_PROMOTIONS`, mixed-case user labels).
-- [ ] `MessageService` bounded concurrency: what is the cap, is it configurable,
-      is it documented?
-- [ ] Every `catch` routes through `GmailErrorMapper`; grep for stragglers.
+      **Done 2026-10-04:** promoted to `internal`, documented, 15 cases pinned
+      in `LabelServiceHeuristicTests`.
+- [x] `MessageService` bounded concurrency: what is the cap, is it configurable,
+      is it documented? **Done 2026-10-04:** cap is 10 (hardcoded, by design —
+      the right value depends on the mailbox's rate-limit budget this tool
+      cannot see); the constant and the reasoning are in the source.
+- [x] Every `catch` routes through `GmailErrorMapper`; grep for stragglers.
+      **Done 2026-10-04:** audited every `catch(Google.GoogleApiException)` in
+      `Gmail/*.cs`; all 24 blocks route through `GmailErrorMapper.Map`. No
+      stragglers.
 
 ### 4b. MIME, send, reply
 
 - [ ] `MimeParser` body selection (plain over HTML) with nested multipart,
-      `multipart/related`, inline images, and no-text-part messages.
-- [ ] `SendService` reply headers: `In-Reply-To`, `References` chaining when the
+      `multipart/related`, inline images, and no-text-part messages. The
+      existing `MimeParserTests` cover the common cases; still open: pin
+      `multipart/related` wrapping `multipart/alternative`, and an HTML-only
+      message that has no text/plain anywhere.
+- [x] `SendService` reply headers: `In-Reply-To`, `References` chaining when the
       original already has `References`; `Reply-To` header respected; reply-all
-      excludes self.
+      excludes self. **Done 2026-10-04:** `BuildReplyFields` now reads
+      `Reply-To` first (RFC 5322 §3.6.2 — mailing-list routing) and dedups
+      the primary recipient out of the reply-all Cc, with address-only
+      comparison so display-name variations collapse. Note: "excludes self"
+      still means "excludes the primary recipient"; the caller's own account
+      address isn't threaded in yet — tracked below.
+- [ ] Pass the signed-in account's email into `BuildReplyFields` so reply-all
+      can drop the current user from Cc even when they are not the primary
+      recipient. Needs an identity-aware seam below the command layer. Raised
+      2026-10-04.
 - [ ] Attachment size limits (Gmail 25 MB) and MIME type detection for `--attach`.
 - [ ] Body encoding: 8-bit vs quoted-printable, CRLF normalisation, BOM stripping
       when body comes from `--body-file`.

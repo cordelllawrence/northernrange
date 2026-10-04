@@ -156,9 +156,15 @@ public class LabelService
         }
     }
 
-    private static bool IsLikelyLabelId(string value) =>
-        value.StartsWith("Label_", StringComparison.Ordinal)
-        || value == value.ToUpperInvariant(); // System labels are all-caps
+    // System labels are all-caps (INBOX, SENT, SPAM, CATEGORY_PROMOTIONS …) and
+    // user labels have IDs of the form "Label_18". Everything else is treated
+    // as a display name and resolved via ResolveNameToIdAsync. False positives
+    // on all-caps user-chosen names (e.g. a label literally called "URGENT")
+    // are handled by the NotFound → re-resolve fallback in Get/Delete.
+    internal static bool IsLikelyLabelId(string value) =>
+        !string.IsNullOrEmpty(value)
+        && (value.StartsWith("Label_", StringComparison.Ordinal)
+            || value == value.ToUpperInvariant());
 
     private static LabelDetail MapLabel(Google.Apis.Gmail.v1.Data.Label l)
     {
