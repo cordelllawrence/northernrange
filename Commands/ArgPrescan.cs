@@ -56,7 +56,7 @@ public static class ArgPrescan
             return args;
 
         var rest = args[i..];
-        if (rest.Length == 0 || rest[0] is "--help" or "-h" or "--version")
+        if (rest.Length == 0 || rest[0] == FlagNames.HelpLong || rest[0] == FlagNames.HelpShortArg || rest[0] == "--version")
             return rest;
 
         return [.. rest, .. hoisted];

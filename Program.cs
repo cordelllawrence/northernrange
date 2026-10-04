@@ -24,25 +24,26 @@ try
 catch (IOException) { /* redirected handle — encoding stays at the host default */ }
 
 // Pre-scan raw args for Serilog configuration before the host exists. Flag
-// names must match GlobalOptions; ArgPrescan handles both "--x v" and "--x=v".
-var isVerbose = ArgPrescan.HasFlag(args, "--verbose", "-v");
-var isJson = ArgPrescan.HasFlag(args, "--json") || EnvVars.JsonRequested();
+// names are the FlagNames.*Long constants, which share spelling with
+// GlobalOptions attributes. ArgPrescan handles both "--x v" and "--x=v".
+var isVerbose = ArgPrescan.HasFlag(args, FlagNames.VerboseLong, FlagNames.VerboseShortArg);
+var isJson = ArgPrescan.HasFlag(args, FlagNames.JsonLong) || EnvVars.JsonRequested();
 ErrorOutput.JsonMode = isJson;
 
-var logFile = ArgPrescan.GetValue(args, "--log-file");
-var isLog = ArgPrescan.HasFlag(args, "--log") || logFile is not null;
-var logFormat = (ArgPrescan.GetValue(args, "--log-format") ?? "jsonl").ToLowerInvariant();
+var logFile = ArgPrescan.GetValue(args, FlagNames.LogFileLong);
+var isLog = ArgPrescan.HasFlag(args, FlagNames.LogLong) || logFile is not null;
+var logFormat = (ArgPrescan.GetValue(args, FlagNames.LogFormatLong) ?? "jsonl").ToLowerInvariant();
 var isLogText = logFormat == "text";
-var logLevelStr = ArgPrescan.GetValue(args, "--log-level");
+var logLevelStr = ArgPrescan.GetValue(args, FlagNames.LogLevelLong);
 
 // LLM documentation — handled before host build (no DI, no auth needed)
-var isLlm = args.Contains("--llm");
-var isLlmFull = args.Contains("--llm-full");
+var isLlm = args.Contains(FlagNames.LlmLong);
+var isLlmFull = args.Contains(FlagNames.LlmFullLong);
 
 if (isLlm || isLlmFull)
 {
     // Remaining args after stripping flags become an optional filter (e.g. "messages", "send reply")
-    var filter = args.Where(a => a is not "--llm" and not "--llm-full" and not "--json").ToArray();
+    var filter = args.Where(a => a != FlagNames.LlmLong && a != FlagNames.LlmFullLong && a != FlagNames.JsonLong).ToArray();
 
     if (isJson)
         Console.WriteLine(LlmDocGenerator.GenerateJsonToolSchema(filter));
@@ -144,7 +145,7 @@ try
     // Cocona exits 129 after printing help that was asked for. Help is a
     // success. (Unknown options, Cocona's other 129, are handled by
     // NrDispatchPipeline before this point.)
-    if (Environment.ExitCode == 129 && ArgPrescan.HasFlag(args, "--help", "-h"))
+    if (Environment.ExitCode == 129 && ArgPrescan.HasFlag(args, FlagNames.HelpLong, FlagNames.HelpShortArg))
         Environment.ExitCode = ExitCodes.Success;
 }
 catch (OperationCanceledException)

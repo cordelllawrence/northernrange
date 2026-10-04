@@ -245,19 +245,31 @@ extraction; the smaller leftovers below are deferred and still live.
       redundant; simplify and add a table of (flags → sinks) as a comment or test.
       **Obsolete:** the Phase 2 rewrite replaced that expression with the
       `isLog && !isLogText` / `isLog && isLogText` pair in `Program.cs`.
-- [ ] **(seed)** `Program.cs` pre-scans raw `args` for `--verbose`, `--json`, `--log*`
+- [x] **(seed)** `Program.cs` pre-scans raw `args` for `--verbose`, `--json`, `--log*`
       and `--llm*` by hand, duplicating what `GlobalOptions` declares. Two sources of
       truth for flag names. Find a way to configure Serilog after Cocona parses, or
-      centralise the flag names.
-- [ ] `ParamValidation` has one method. Either grow it (email format, hex colour,
-      label name rules) or inline it.
-- [ ] `GlobalOptions` is a positional record with ten parameters. Fine for Cocona,
+      centralise the flag names. **Done 2026-10-04:** `Commands/FlagNames.cs` is now
+      the single spelling store. `GlobalOptions` uses `FlagNames.*` in its
+      `[Option]` attributes, and `Program.cs` + `ArgPrescan` use the matching
+      `*Long` / `*Short` constants.
+- [x] `ParamValidation` has one method. Either grow it (email format, hex colour,
+      label name rules) or inline it. **Note:** stale — it already has three
+      methods (`RequireRange`, `RequireOneOf`, `SplitList`), each used by at
+      least one command. Growing it is still open (email / hex colour / label
+      name rules), but it is no longer "one method".
+- [x] `GlobalOptions` is a positional record with ten parameters. Fine for Cocona,
       but check the `--llm` generator's reliance on `GetConstructors()[0]`.
+      **Done 2026-10-04:** `GlobalOptionsReflectionTests` pins both assumptions
+      (exactly one public constructor; every parameter has an `[Option]`), and
+      asserts each known `FlagNames.*` long name is bound to a parameter. The
+      `--llm` generator and `ArgPrescan.HoistGlobalOptions` share this
+      assumption; the test guards both.
 - [ ] `AuthCommands.GetAllAccountNames` discovers accounts from token directories.
       Confirm that is intended behaviour and covered by a test.
 - [ ] Nullable annotations: any `!` suppressions or `?? ""` that hide real nulls.
 - [ ] Naming: `_gmailFactory` vs `GmailClientFactory`, `SendService` also owns
-      drafts; consider `DraftService` split or rename.
+      drafts; consider `DraftService` split or rename. (`_gmailFactory` is now
+      private to `CommandPrelude`; the question is whether to split `SendService`.)
 
 ---
 
