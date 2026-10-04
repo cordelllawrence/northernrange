@@ -322,10 +322,19 @@ Goal: the Gmail layer is correct, safe, and testable without a network.
       can drop the current user from Cc even when they are not the primary
       recipient. Needs an identity-aware seam below the command layer. Raised
       2026-10-04.
-- [ ] Attachment size limits (Gmail 25 MB) and MIME type detection for `--attach`.
+- [x] Attachment size limits (Gmail 25 MB) and MIME type detection for `--attach`.
+      **Partial 2026-10-04:** cumulative attachment size is checked up front
+      against a 20 MiB on-disk threshold (25 MB after base64) with exit 2 and
+      a clear hint. MIME type detection still relies on MimeKit's default
+      content-type sniff from the file extension; good enough for the common
+      cases, but typeless or ambiguous files aren't tested yet.
 - [ ] Body encoding: 8-bit vs quoted-printable, CRLF normalisation, BOM stripping
       when body comes from `--body-file`.
-- [ ] Address validation: what happens with `--to "not an email"`?
+- [x] Address validation: what happens with `--to "not an email"`? **Done
+      2026-10-04:** `SendService.ParseAddressList` now wraps MimeKit's lenient
+      parser with a shape check (needs `@`, dotted domain, no whitespace) and
+      raises `NrException(InvalidArguments)` naming the flag + bad entry on
+      failure. Covers `--to`, `--cc`, `--bcc`.
 
 ### 4c. Auth
 

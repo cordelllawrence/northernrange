@@ -311,6 +311,36 @@ public class SendService
         value.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim());
 
     /// <summary>
+    /// Parse a list of addresses, turning MimeKit's <see cref="MimeKit.ParseException"/>
+    /// into a user-facing <see cref="NrException"/> (exit 2) that names the
+    /// bad entry. Accepts both bare addresses and display-name forms
+    /// ("Alice &lt;a@x.com&gt;"). MimeKit's parser is lenient (it will accept
+    /// an unqualified token as a local-part); this adds a shape check so
+    /// obvious non-addresses are rejected up front.
+    /// </summary>
+    internal static List<MailboxAddress> ParseAddressList(IEnumerable<string> addresses, string flag)
+    {
+        var result = new List<MailboxAddress>();
+        foreach (var raw in addresses)
+        {
+            if (!MailboxAddress.TryParse(raw, out var parsed) || !LooksLikeEmailAddress(parsed.Address))
+                throw new NrException(ExitCodes.InvalidArguments,
+                    $"{flag}: '{raw}' is not a valid email address.");
+            result.Add(parsed);
+        }
+        return result;
+    }
+
+    private static bool LooksLikeEmailAddress(string? address)
+    {
+        if (string.IsNullOrWhiteSpace(address)) return false;
+        var at = address.IndexOf('@');
+        if (at <= 0 || at >= address.Length - 1) return false;
+        if (address.AsSpan(at + 1).IndexOf('.') < 0) return false;
+        return !address.Any(char.IsWhiteSpace);
+    }
+
+    /// <summary>
     /// Returns the bare email address from an RFC 5322 mailbox form.
     /// "Alice &lt;a@x.com&gt;" → "a@x.com"; "a@x.com" → "a@x.com". No parsing
     /// of groups or quoted locals — this is address-level dedup, not display.
@@ -326,6 +356,11 @@ public class SendService
 
     // ── MIME builder ─────────────────────────────────────────────────────────
 
+    // Gmail accepts up to 25 MB total message size on send. Base64 adds
+    // roughly 1.37x; the on-disk threshold is set at 20 MB so the encoded
+    // message stays comfortably under the API limit.
+    internal const long GmailAttachmentLimitBytes = 20L * 1024 * 1024;
+
     private static async Task<Message> BuildRawMessageAsync(
         IList<string> to,
         IList<string>? cc,
@@ -337,9 +372,9 @@ public class SendService
         string? references = null)
     {
         var mime = new MimeMessage();
-        mime.To.AddRange(to.Select(MailboxAddress.Parse));
-        if (cc?.Count  > 0) mime.Cc.AddRange(cc.Select(MailboxAddress.Parse));
-        if (bcc?.Count > 0) mime.Bcc.AddRange(bcc.Select(MailboxAddress.Parse));
+        mime.To.AddRange(ParseAddressList(to, "--to"));
+        if (cc?.Count  > 0) mime.Cc.AddRange(ParseAddressList(cc, "--cc"));
+        if (bcc?.Count > 0) mime.Bcc.AddRange(ParseAddressList(bcc, "--bcc"));
         mime.Subject = subject;
 
         if (!string.IsNullOrEmpty(inReplyTo))
@@ -353,10 +388,23 @@ public class SendService
 
         if (attachmentPaths?.Count > 0)
         {
+            long totalBytes = 0;
             foreach (var path in attachmentPaths)
             {
                 if (!File.Exists(path))
                     throw new NrException(ExitCodes.FileError, $"Attachment not found: {path}");
+
+                var size = new FileInfo(path).Length;
+                totalBytes += size;
+                // Gmail rejects anything over 25 MB total. Base64 adds ~37%,
+                // so we warn earlier: 20 MB on disk ≈ 27 MB on the wire. The
+                // actual API rejection is still the authoritative stop; this
+                // just gives a precise exit 2 before the upload starts.
+                if (totalBytes > GmailAttachmentLimitBytes)
+                    throw new NrException(ExitCodes.InvalidArguments,
+                        $"Attachments exceed Gmail's send limit (~{GmailAttachmentLimitBytes / (1024 * 1024)} MB combined). " +
+                        "Share a link instead, or split the send.");
+
                 await builder.Attachments.AddAsync(path);
             }
         }
