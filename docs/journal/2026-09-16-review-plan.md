@@ -443,7 +443,12 @@ Goal: everything around the code is current and single-sourced.
       referenced from tracked docs. Moved to `docs/journal/` and tracked, 2026-09-16.
 - [x] Docs layout: durable docs in `docs/`, dated plans and reviews in `docs/journal/`.
       Done 2026-09-16. Only `README.md` remains in the root.
-- [ ] Add `CHANGELOG.md`; the version is 0.1.2-beta with no history.
+- [x] Add `CHANGELOG.md`; the version is 0.1.2-beta with no history.
+      **Done 2026-10-04:** `CHANGELOG.md` created with the 0.2.0-beta entry
+      summarising CLI grammar, contract fixes, correctness fixes, code
+      structure, docs reframing, and the 87→244 test growth across the
+      0.1.2-beta → 0.2.0-beta range. `docs/ARCHITECTURE.md`'s version string
+      bumped to match.
 - [ ] `docs/ARCHITECTURE.md` status note: still accurate after this sweep?
 
 ### 6b. Dependencies

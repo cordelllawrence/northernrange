@@ -1,6 +1,6 @@
 # northernrange — Architecture & Current State
 
-**Binary:** `nr`  **Version:** 0.1.2-beta  **Runtime:** .NET 10.0 (single-file, self-contained)
+**Binary:** `nr`  **Version:** 0.2.0-beta  **Runtime:** .NET 10.0 (single-file, self-contained)
 
 This document describes where the application actually is today — its command
 surface, internal structure, and the design decisions behind it. It is the
