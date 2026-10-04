@@ -454,10 +454,19 @@ Goal: everything around the code is current and single-sourced.
 
 - [ ] **(seed)** `client_Secrets.json` and `client_secret_northernrange.json` live in
       the repo root. They are ignored, but one wrong `git add -f` away from a leak.
-      Move them to the config directory the tool already looks in.
-- [ ] `.claude/settings.json` allow-list references `d:/dev2/…` paths. Stale.
-- [ ] **(seed)** No CI on push or pull request. `release.yml` only builds on tags, and
+      Move them to the config directory the tool already looks in. The two
+      files on disk are currently empty placeholders; the move is still worth
+      doing but needs the user to confirm nothing live is in them.
+- [x] `.claude/settings.json` allow-list references `d:/dev2/…` paths. Stale.
+      **Moot:** `.claude/` is already in `.gitignore` and no `.claude` files
+      are tracked. The stale paths live only in the user's local config.
+- [x] **(seed)** No CI on push or pull request. `release.yml` only builds on tags, and
       never runs the tests. Add `ci.yml`: build, test, `dotnet format --verify-no-changes`.
+      **Done 2026-10-04:** `.github/workflows/ci.yml` runs on push + PR to
+      main across Ubuntu, Windows, macOS. Build is `-warnaserror`, tests run
+      in Release, `dotnet format --verify-no-changes` runs on the Linux leg.
+      Fixed the one pre-existing nullable warning in `ParamValidationTests`
+      and ran `dotnet format` across the solution to make it green.
 - [ ] `build.sh` vs `release.yml`: two publish recipes. Make one call the other or
       document which is canonical.
 - [ ] `.gitattributes` and line endings on Windows-authored files.

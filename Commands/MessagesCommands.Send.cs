@@ -32,8 +32,8 @@ public partial class MessagesCommands
             ("To", string.Join(", ", to)));
 
         var bodyText = await ResolveBodyAsync(body, bodyFile);
-        var gmail    = await session.GmailAsync();
-        var result   = await _sendService.SendNewAsync(
+        var gmail = await session.GmailAsync();
+        var result = await _sendService.SendNewAsync(
             gmail, to, cc, bcc, subject, bodyText, attach, draft);
 
         if (session.Mode == OutputMode.Json)
@@ -62,8 +62,8 @@ public partial class MessagesCommands
             ("MessageId", messageId));
 
         var bodyText = await ResolveBodyAsync(body, bodyFile);
-        var gmail    = await session.GmailAsync();
-        var result   = await _sendService.SendReplyAsync(
+        var gmail = await session.GmailAsync();
+        var result = await _sendService.SendReplyAsync(
             gmail, messageId, bodyText, attach, replyAll, draft);
 
         if (session.Mode == OutputMode.Json)

@@ -52,9 +52,9 @@ public class ErrorHandlingFilter : CommandFilterAttribute
 
         return ex.Result switch
         {
-            ParameterBinderResult.InsufficientOption      => $"Missing required option {name}.",
+            ParameterBinderResult.InsufficientOption => $"Missing required option {name}.",
             ParameterBinderResult.InsufficientOptionValue => $"Option {name} needs a value.",
-            ParameterBinderResult.InsufficientArgument    => $"Missing required argument {name}.",
+            ParameterBinderResult.InsufficientArgument => $"Missing required argument {name}.",
             _ => $"Invalid value for {name}: expected {Expected(type)}.",
         };
     }

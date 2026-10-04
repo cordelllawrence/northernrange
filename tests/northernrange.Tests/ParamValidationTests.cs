@@ -52,6 +52,7 @@ public class ParamValidationTests
     public void SplitList_AcceptsCommaSeparated_AndRepeated_Combined()
     {
         var result = ParamValidation.SplitList(["From, Subject", "Date", "", " Cc "]);
+        Assert.NotNull(result);
         Assert.Equal(["From", "Subject", "Date", "Cc"], result);
     }
 

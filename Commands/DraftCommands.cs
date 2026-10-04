@@ -21,9 +21,9 @@ public class DraftCommands
         ILogger<DraftCommands> logger)
     {
         _sendService = sendService;
-        _prelude     = prelude;
-        _output      = output;
-        _logger      = logger;
+        _prelude = prelude;
+        _output = output;
+        _logger = logger;
     }
 
     [ErrorHandlingFilter]
@@ -37,7 +37,7 @@ public class DraftCommands
 
         using var session = _prelude.Begin(globals, _logger, "drafts.list");
 
-        var gmail  = await session.GmailAsync();
+        var gmail = await session.GmailAsync();
         var result = await _sendService.ListDraftsAsync(gmail, max, pageToken);
 
         if (session.Mode == OutputMode.Json)
@@ -55,7 +55,7 @@ public class DraftCommands
         else
         {
             var dateFormat = session.Config.DateFormat;
-            var headers    = new[] { "Draft ID", "Date", "To", "Subject", "Snippet" };
+            var headers = new[] { "Draft ID", "Date", "To", "Subject", "Snippet" };
             var rows = result.Drafts.Select(d => new[]
             {
                 d.DraftId,
@@ -82,7 +82,7 @@ public class DraftCommands
         using var session = _prelude.Begin(globals, _logger, "drafts.send",
             ("DraftId", draftId));
 
-        var gmail  = await session.GmailAsync();
+        var gmail = await session.GmailAsync();
         var result = await _sendService.SendDraftAsync(gmail, draftId);
 
         if (session.Mode == OutputMode.Json)

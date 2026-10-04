@@ -373,7 +373,7 @@ public class SendService
     {
         var mime = new MimeMessage();
         mime.To.AddRange(ParseAddressList(to, "--to"));
-        if (cc?.Count  > 0) mime.Cc.AddRange(ParseAddressList(cc, "--cc"));
+        if (cc?.Count > 0) mime.Cc.AddRange(ParseAddressList(cc, "--cc"));
         if (bcc?.Count > 0) mime.Bcc.AddRange(ParseAddressList(bcc, "--bcc"));
         mime.Subject = subject;
 

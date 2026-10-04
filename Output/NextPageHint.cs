@@ -27,8 +27,8 @@ public static class NextPageHint
 
         if (globals is not null)
         {
-            if (globals.Account is not null)     sb.Append(" --account ").Append(Quote(globals.Account));
-            if (globals.Config is not null)      sb.Append(" --config ").Append(Quote(globals.Config));
+            if (globals.Account is not null) sb.Append(" --account ").Append(Quote(globals.Account));
+            if (globals.Config is not null) sb.Append(" --config ").Append(Quote(globals.Config));
             if (globals.Credentials is not null) sb.Append(" --credentials ").Append(Quote(globals.Credentials));
         }
 
