@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace NorthernRange.Output;
 
@@ -14,9 +15,14 @@ public static class ErrorOutput
     public static bool JsonMode { get; set; }
 
     // Keep quotes and non-ASCII readable; stderr is for humans and agents, not HTML.
+    // TypeInfoResolver is required: trimmed/single-file publish sets
+    // JsonSerializerIsReflectionEnabledByDefault=false, which otherwise makes
+    // Serialize throw NotSupportedException the first time nr tries to emit
+    // an error envelope.
     private static readonly JsonSerializerOptions Options = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
     };
 
     public static void Write(int exitCode, string message)

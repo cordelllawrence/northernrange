@@ -1,10 +1,18 @@
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace NorthernRange.Config;
 
 public class ConfigLoader
 {
-    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+    // TypeInfoResolver is required: trimmed/single-file publish sets
+    // JsonSerializerIsReflectionEnabledByDefault=false, which otherwise makes
+    // Deserialize throw NotSupportedException on the first config read.
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+    };
 
     public AppConfig Load(string? configPathOverride = null)
     {

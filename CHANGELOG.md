@@ -8,6 +8,23 @@ and `nr` follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Pre-1.0 releases may still change CLI grammar or JSON shapes; breaking changes
 are called out explicitly in each entry.
 
+## [Unreleased]
+
+### Fixed
+
+- Trimmed/single-file publish broke `--json` error output and config file
+  loading. `JsonSerializer` was called with options that had no
+  `TypeInfoResolver`, which the SDK's auto-set
+  `JsonSerializerIsReflectionEnabledByDefault=false` (default under
+  `PublishTrimmed=true`) turned into a `NotSupportedException` on the first
+  envelope write or config read, surfacing as "Unhandled Exception" and
+  exit 1 instead of the documented JSON envelope and exit code.
+  `Output/ErrorOutput.cs` and `Config/ConfigLoader.cs` now set
+  `TypeInfoResolver = new DefaultJsonTypeInfoResolver()` explicitly.
+  Regression caught by setting `JsonSerializerIsReflectionEnabledByDefault=false`
+  on the test project, which fails the same way as the trimmed binary.
+  Found by an agent running `nr 0.2.0-beta` on grouper (commit `4cacfc8`).
+
 ## [0.2.0-beta] — 2026-10-04
 
 A broad sweep across the CLI surface, the JSON/exit-code contract, the Gmail

@@ -11,6 +11,12 @@
     <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>false</SelfContained>
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Simulate the trimmed-build behaviour: when PublishTrimmed=true the
+         SDK auto-sets this to false, so any JsonSerializer call lacking an
+         explicit TypeInfoResolver throws NotSupportedException. Pinning the
+         same value here surfaces those regressions in a plain `dotnet test`
+         instead of only in `dotnet publish`. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
