@@ -1,6 +1,5 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
-using NorthernRange.Config;
 using NorthernRange.Errors;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
@@ -17,28 +16,25 @@ public partial class MessagesCommands
     public static readonly string[] ListFormats = ["metadata", "minimal"];
     public static readonly string[] ReadFormats = ["full", "metadata", "minimal", "raw"];
 
-    private readonly GmailClientFactory _gmailFactory;
     private readonly MessageService _messageService;
     private readonly LabelService _labelService;
     private readonly SendService _sendService;
-    private readonly AccountResolver _resolver;
+    private readonly CommandPrelude _prelude;
     private readonly OutputWriter _output;
     private readonly ILogger<MessagesCommands> _logger;
 
     public MessagesCommands(
-        GmailClientFactory gmailFactory,
         MessageService messageService,
         LabelService labelService,
         SendService sendService,
-        AccountResolver resolver,
+        CommandPrelude prelude,
         OutputWriter output,
         ILogger<MessagesCommands> logger)
     {
-        _gmailFactory = gmailFactory;
         _messageService = messageService;
         _labelService = labelService;
         _sendService = sendService;
-        _resolver = resolver;
+        _prelude = prelude;
         _output = output;
         _logger = logger;
     }
@@ -53,22 +49,20 @@ public partial class MessagesCommands
         [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null,
         [Option("format", Description = "Detail level: 'metadata' (default) adds headers and snippet; 'minimal' returns IDs only.")] string format = "metadata")
     {
-        var ctx = _resolver.Resolve(globals);
-        var effectiveLabel = label ?? ctx.Config.DefaultLabel;
-        var effectiveMax = max ?? ctx.Config.DefaultMaxResults;
+        using var session = _prelude.Begin(globals, _logger, "messages.list");
+
+        var effectiveLabel = label ?? session.Config.DefaultLabel;
+        var effectiveMax = max ?? session.Config.DefaultMaxResults;
         ParamValidation.RequireRange(effectiveMax, 1, 500, "max");
         format = ParamValidation.RequireOneOf(format, ListFormats, "format");
 
-        var mode = _output.DetermineMode(globals, ctx.Config);
-
-        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "messages.list" });
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
 
         // Resolve label name to ID (e.g. "Inbox" → "INBOX")
         var resolvedLabel = (await _labelService.GetAsync(gmail, effectiveLabel)).Id;
         var result = await _messageService.ListAsync(gmail, resolvedLabel, query, effectiveMax, pageToken, format);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -88,11 +82,11 @@ public partial class MessagesCommands
                 m.Id,
                 PlainTextRenderer.Truncate(m.From, 30),
                 PlainTextRenderer.Truncate(m.Subject, 40),
-                PlainTextRenderer.FormatDate(m.Date, ctx.Config.DateFormat),
+                PlainTextRenderer.FormatDate(m.Date, session.Config.DateFormat),
                 PlainTextRenderer.Truncate(m.Snippet, 60)
             }).ToList();
 
-            _output.WriteTable(headers, rows, mode);
+            _output.WriteTable(headers, rows, session.Mode);
         }
 
         if (!string.IsNullOrEmpty(result.NextPageToken))
@@ -113,16 +107,10 @@ public partial class MessagesCommands
             throw new NrException(ExitCodes.InvalidArguments,
                 "No label change given. Use --add <label> and/or --remove <label>, repeatable.");
 
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "messages.label",
+            ("MessageId", id));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "messages.label",
-            ["MessageId"] = id
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
 
         // Resolve label names to IDs
         var addIds = await ResolveLabelIdsAsync(gmail, add);
@@ -130,7 +118,7 @@ public partial class MessagesCommands
 
         var result = await _messageService.ModifyLabelsAsync(gmail, id, addIds, removeIds);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -167,23 +155,17 @@ public partial class MessagesCommands
         [Option("format", Description = "Detail level: 'full' (default) decoded body; 'metadata' headers only; 'minimal' IDs and labels only; 'raw' RFC 2822 bytes to stdout.")] string format = "full",
         [Option("include-headers", Description = "Header names to include with --format metadata. Comma-separated or repeated. Default: From,To,Cc,Subject,Date,Message-ID.")] List<string>? includeHeaders = null)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
         format = ParamValidation.RequireOneOf(format, ReadFormats, "format");
-
         var headerNames = ParamValidation.SplitList(includeHeaders);
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "messages.read",
-            ["MessageId"] = id
-        });
+        using var session = _prelude.Begin(globals, _logger, "messages.read",
+            ("MessageId", id));
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
 
         // Raw format (non-JSON): stream the original RFC 2822 bytes straight to
         // stdout — binary-safe, suitable for piping to a .eml file or another tool.
-        if (format == "raw" && mode != OutputMode.Json)
+        if (format == "raw" && session.Mode != OutputMode.Json)
         {
             var rawBytes = await _messageService.GetRawAsync(gmail, id);
             await using var stdout = Console.OpenStandardOutput();
@@ -193,7 +175,7 @@ public partial class MessagesCommands
 
         var message = await _messageService.GetAsync(gmail, id, format, headerNames);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(message);
             return;
@@ -206,7 +188,7 @@ public partial class MessagesCommands
                 ("ID", message.Id),
                 ("Thread", message.ThreadId ?? ""),
                 ("Labels", string.Join(", ", message.LabelIds))
-            ], mode);
+            ], session.Mode);
             return;
         }
 
@@ -215,7 +197,7 @@ public partial class MessagesCommands
             ("To", message.Headers.GetValueOrDefault("To", "")),
             ("Subject", message.Headers.GetValueOrDefault("Subject", "")),
             ("Date", message.Headers.GetValueOrDefault("Date", ""))
-        ], mode);
+        ], session.Mode);
 
         if (!string.IsNullOrEmpty(message.Snippet) && format == "metadata")
         {

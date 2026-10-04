@@ -1,6 +1,5 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
-using NorthernRange.Config;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
@@ -9,22 +8,19 @@ namespace NorthernRange.Commands;
 
 public class AttachmentsCommands
 {
-    private readonly GmailClientFactory _gmailFactory;
     private readonly AttachmentService _attachmentService;
-    private readonly AccountResolver _resolver;
+    private readonly CommandPrelude _prelude;
     private readonly OutputWriter _output;
     private readonly ILogger<AttachmentsCommands> _logger;
 
     public AttachmentsCommands(
-        GmailClientFactory gmailFactory,
         AttachmentService attachmentService,
-        AccountResolver resolver,
+        CommandPrelude prelude,
         OutputWriter output,
         ILogger<AttachmentsCommands> logger)
     {
-        _gmailFactory = gmailFactory;
         _attachmentService = attachmentService;
-        _resolver = resolver;
+        _prelude = prelude;
         _output = output;
         _logger = logger;
     }
@@ -35,19 +31,13 @@ public class AttachmentsCommands
         GlobalOptions globals,
         [Argument(Description = "Gmail message ID. Find messages with 'nr messages list -q \"has:attachment\"'.")] string messageId)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "attachments.list",
+            ("MessageId", messageId));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "attachments.list",
-            ["MessageId"] = messageId
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         var result = await _attachmentService.ListFromMessageAsync(gmail, messageId);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -71,7 +61,7 @@ public class AttachmentsCommands
             PlainTextRenderer.FormatSize(a.Size)
         }).ToList();
 
-        _output.WriteTable(headers, rows, mode);
+        _output.WriteTable(headers, rows, session.Mode);
     }
 
     [ErrorHandlingFilter]
@@ -83,20 +73,14 @@ public class AttachmentsCommands
         [Option('o', Description = "Destination file or directory. Default: current directory using original filename.")] string? output = null,
         [Option("force", Description = "Overwrite the output file if it already exists.")] bool force = false)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "attachments.download",
+            ("MessageId", messageId),
+            ("AttachmentId", attachmentId));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "attachments.download",
-            ["MessageId"] = messageId,
-            ["AttachmentId"] = attachmentId
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         var result = await _attachmentService.DownloadAsync(gmail, messageId, attachmentId, output, force);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;

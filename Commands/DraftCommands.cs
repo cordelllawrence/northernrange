@@ -1,6 +1,5 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
-using NorthernRange.Config;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Models;
@@ -10,24 +9,21 @@ namespace NorthernRange.Commands;
 
 public class DraftCommands
 {
-    private readonly GmailClientFactory _gmailFactory;
     private readonly SendService _sendService;
-    private readonly AccountResolver _resolver;
+    private readonly CommandPrelude _prelude;
     private readonly OutputWriter _output;
     private readonly ILogger<DraftCommands> _logger;
 
     public DraftCommands(
-        GmailClientFactory gmailFactory,
         SendService sendService,
-        AccountResolver resolver,
+        CommandPrelude prelude,
         OutputWriter output,
         ILogger<DraftCommands> logger)
     {
-        _gmailFactory = gmailFactory;
-        _sendService  = sendService;
-        _resolver     = resolver;
-        _output       = output;
-        _logger       = logger;
+        _sendService = sendService;
+        _prelude     = prelude;
+        _output      = output;
+        _logger      = logger;
     }
 
     [ErrorHandlingFilter]
@@ -39,14 +35,12 @@ public class DraftCommands
     {
         ParamValidation.RequireRange(max, 1, 500, "max");
 
-        var ctx  = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "drafts.list");
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "drafts.list" });
-        var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail  = await session.GmailAsync();
         var result = await _sendService.ListDraftsAsync(gmail, max, pageToken);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -60,7 +54,7 @@ public class DraftCommands
         }
         else
         {
-            var dateFormat = ctx.Config.DateFormat;
+            var dateFormat = session.Config.DateFormat;
             var headers    = new[] { "Draft ID", "Date", "To", "Subject", "Snippet" };
             var rows = result.Drafts.Select(d => new[]
             {
@@ -71,7 +65,7 @@ public class DraftCommands
                 PlainTextRenderer.Truncate(d.Snippet, 45)
             }).ToList();
 
-            _output.WriteTable(headers, rows, mode);
+            _output.WriteTable(headers, rows, session.Mode);
         }
 
         if (!string.IsNullOrEmpty(result.NextPageToken))
@@ -85,19 +79,13 @@ public class DraftCommands
         GlobalOptions globals,
         [Argument(Description = "Draft ID to send. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
-        var ctx  = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "drafts.send",
+            ("DraftId", draftId));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "drafts.send",
-            ["DraftId"] = draftId
-        });
-
-        var gmail  = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail  = await session.GmailAsync();
         var result = await _sendService.SendDraftAsync(gmail, draftId);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -112,19 +100,13 @@ public class DraftCommands
         GlobalOptions globals,
         [Argument(Description = "Draft ID to delete. Get from 'nr drafts list' or 'nr drafts list --json'.")] string draftId)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "drafts.delete",
+            ("DraftId", draftId));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "drafts.delete",
-            ["DraftId"] = draftId
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         await _sendService.DeleteDraftAsync(gmail, draftId);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(new DeleteResult(true, draftId));
             return;

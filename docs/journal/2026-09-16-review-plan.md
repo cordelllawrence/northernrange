@@ -207,8 +207,12 @@ the paths Cocona owns before our code runs.
       Review what belongs at Information vs Debug.
 - [x] `--verbose` output: confirm nothing secret (token, auth code, client secret) is
       ever logged at any level.
-- [ ] Redirected stdout with `--ui`: confirm auto-disable actually works on Windows
-      and Linux.
+- [x] Redirected stdout with `--ui`: confirm auto-disable actually works on Windows
+      and Linux. Done 2026-10-03: `DetermineMode` now has a testable overload that
+      takes the redirect signal directly; `OutputWriterModeTests` covers both
+      branches without relying on the host console. `Console.IsOutputRedirected`
+      is a BCL property backed by `isatty`/`GetFileType`, so the same logic is
+      exercised on either platform.
 - [x] `--ui` is "best-effort" (`WritePlain` and `WriteDivider` ignore mode). Either
       finish it or document it as partial in `--help`.
 
@@ -218,23 +222,37 @@ the paths Cocona owns before our code runs.
 
 Goal: remove repetition, tighten the seams, make the command layer boring.
 
-- [ ] **(seed)** Every command method repeats the same prologue: resolve account,
+Done 2026-10-03 (commit "Phase 3: command prologue extraction"). Summary:
+`2026-10-03-phase-3-commands.md`. The big-ticket item was the prologue
+extraction; the smaller leftovers below are deferred and still live.
+
+- [x] **(seed)** Every command method repeats the same prologue: resolve account,
       determine output mode, open a log scope, build the Gmail client. Seven classes,
       ~20 methods. Extract a `CommandContext` / base helper so a command is only its
-      own logic.
+      own logic. **Done:** `Commands/CommandSession.cs` introduces `CommandPrelude`
+      and `CommandSession`; every command now opens with
+      `using var session = _prelude.Begin(globals, _logger, "<name>", …)` and
+      pulls the Gmail client on demand via `session.GmailAsync()`. Commands no
+      longer depend on `AccountResolver` or `GmailClientFactory` directly.
+- [x] `AuthCommands.StatusAsync` duplicates the key-value rendering in two places.
+      **Done:** both branches now call `WriteStatusEntry(entry, mode)`.
+- [x] `Program.cs` catch block calls `Environment.Exit(1)` inside a `try` whose
+      `finally` flushes logs. Verify flush still happens; return the code instead.
+      **Already fixed in Phase 2** (see `2026-09-16-phase-2-contracts.md`); the
+      catch now sets `Environment.ExitCode`, so the `finally`'s
+      `Log.CloseAndFlushAsync()` runs.
+- [x] Serilog config expression `isLogFlat || (logFile is not null && isLogFlat)` is
+      redundant; simplify and add a table of (flags → sinks) as a comment or test.
+      **Obsolete:** the Phase 2 rewrite replaced that expression with the
+      `isLog && !isLogText` / `isLog && isLogText` pair in `Program.cs`.
 - [ ] **(seed)** `Program.cs` pre-scans raw `args` for `--verbose`, `--json`, `--log*`
       and `--llm*` by hand, duplicating what `GlobalOptions` declares. Two sources of
       truth for flag names. Find a way to configure Serilog after Cocona parses, or
       centralise the flag names.
-- [ ] `Program.cs` catch block calls `Environment.Exit(1)` inside a `try` whose
-      `finally` flushes logs. Verify flush still happens; return the code instead.
-- [ ] Serilog config expression `isLogFlat || (logFile is not null && isLogFlat)` is
-      redundant; simplify and add a table of (flags → sinks) as a comment or test.
 - [ ] `ParamValidation` has one method. Either grow it (email format, hex colour,
       label name rules) or inline it.
 - [ ] `GlobalOptions` is a positional record with ten parameters. Fine for Cocona,
       but check the `--llm` generator's reliance on `GetConstructors()[0]`.
-- [ ] `AuthCommands.StatusAsync` duplicates the key-value rendering in two places.
 - [ ] `AuthCommands.GetAllAccountNames` discovers accounts from token directories.
       Confirm that is intended behaviour and covered by a test.
 - [ ] Nullable annotations: any `!` suppressions or `?? ""` that hide real nulls.
@@ -368,6 +386,11 @@ Goal: everything around the code is current and single-sourced.
       Generate it from `nr --llm-full`, or add a test that diffs them.
 - [ ] `README.md`, `docs/USAGE.md`, `docs/ARCHITECTURE.md`, and the journal reviews overlap. Define
       what each one is for and remove duplication (exit-code table appears in three).
+- [ ] Reframe the project pitch. `README.md` and `docs/ARCHITECTURE.md` currently
+      describe `nr` as a Gmail CLI; the intended positioning is an open-source CLI
+      that gives local AI agents and their harnesses direct access to Gmail.
+      Rewrite the lede, the "why" section, and the agent-facing hooks (`--llm`,
+      JSON contracts, exit codes) through that lens. Raised 2026-10-03.
 - [x] **(seed)** `requirements.md` and `llm-documentation-plan.md` were gitignored yet
       referenced from tracked docs. Moved to `docs/journal/` and tracked, 2026-09-16.
 - [x] Docs layout: durable docs in `docs/`, dated plans and reviews in `docs/journal/`.

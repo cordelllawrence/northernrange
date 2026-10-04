@@ -12,20 +12,20 @@ namespace NorthernRange.Commands;
 public class AuthCommands
 {
     private readonly AuthService _authService;
-    private readonly AccountResolver _resolver;
+    private readonly CommandPrelude _prelude;
     private readonly ConfigPersister _configPersister;
     private readonly OutputWriter _output;
     private readonly ILogger<AuthCommands> _logger;
 
     public AuthCommands(
         AuthService authService,
-        AccountResolver resolver,
+        CommandPrelude prelude,
         ConfigPersister configPersister,
         OutputWriter output,
         ILogger<AuthCommands> logger)
     {
         _authService = authService;
-        _resolver = resolver;
+        _prelude = prelude;
         _configPersister = configPersister;
         _output = output;
         _logger = logger;
@@ -38,67 +38,66 @@ public class AuthCommands
         [Option("force", Description = "Delete the stored token and re-run the full browser consent flow.")]
         bool force = false)
     {
-        var ctx = _resolver.Resolve(globals);
+        using var session = _prelude.Begin(globals, _logger, "auth.login");
 
-        var result = await _authService.LoginAsync(ctx.CredentialsPath, ctx.TokenStorePath, force);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        var result = await _authService.LoginAsync(
+            session.Account.CredentialsPath, session.Account.TokenStorePath, force);
 
         // Auto-create account entry in config on successful login
-        if (_configPersister.EnsureAccount(ctx.Config, ctx.AccountName))
-            _configPersister.Save(ctx.Config, globals.Config);
+        if (_configPersister.EnsureAccount(session.Config, session.Account.AccountName))
+            _configPersister.Save(session.Config, globals.Config);
 
-        var loginResult = new AuthLoginResult(result.Status, result.Email, ctx.AccountName);
+        var loginResult = new AuthLoginResult(result.Status, result.Email, session.Account.AccountName);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
             _output.WriteJson(loginResult);
         else
-            _output.WritePlain($"Authenticated successfully as {result.Email} (account: {ctx.AccountName})");
+            _output.WritePlain($"Authenticated successfully as {result.Email} (account: {session.Account.AccountName})");
     }
 
     [ErrorHandlingFilter]
     [Command("logout", Description = "Revoke the stored OAuth2 token with Google and delete it locally.")]
     public async Task LogoutAsync(GlobalOptions globals)
     {
-        var ctx = _resolver.Resolve(globals);
+        using var session = _prelude.Begin(globals, _logger, "auth.logout");
 
-        await _authService.LogoutAsync(ctx.TokenStorePath);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        await _authService.LogoutAsync(session.Account.TokenStorePath);
 
-        var result = new AuthLogoutResult("logged_out", ctx.AccountName);
+        var result = new AuthLogoutResult("logged_out", session.Account.AccountName);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
             _output.WriteJson(result);
         else
-            _output.WritePlain($"Logged out (account: {ctx.AccountName}). Token revoked.");
+            _output.WritePlain($"Logged out (account: {session.Account.AccountName}). Token revoked.");
     }
 
     [ErrorHandlingFilter]
     [Command("status", Description = "Show authentication state for one account (--account) or all accounts. No network call.")]
     public async Task<int> StatusAsync(GlobalOptions globals)
     {
-        var config = _resolver.LoadConfig(globals.Config);
-        var mode = _output.DetermineMode(globals, config);
+        // Status walks every known account when --account is absent, so it
+        // can't use the account-bound prelude for the no-account branch.
+        var (config, mode, scope) = _prelude.BeginConfigOnly(globals, _logger, "auth.status");
+        using var _ = scope;
 
         // If a specific account was requested, show just that one
         if (globals.Account != null)
         {
-            var ctx = _resolver.Resolve(globals);
+            var ctx = _prelude.Resolver.Resolve(globals);
             var status = await _authService.GetStatusAsync(ctx.TokenStorePath);
 
+            var entry = new AccountStatusEntry(
+                ctx.AccountName,
+                ctx.AccountName == (config.DefaultAccount ?? "default"),
+                status.Authenticated,
+                status.Email,
+                status.TokenExpiry,
+                status.TokenValid);
+
             if (mode == OutputMode.Json)
-            {
-                _output.WriteJson(new AccountStatusEntry(
-                    ctx.AccountName,
-                    ctx.AccountName == (config.DefaultAccount ?? "default"),
-                    status.Authenticated,
-                    status.Email,
-                    status.TokenExpiry,
-                    status.TokenValid));
-            }
+                _output.WriteJson(entry);
             else
-            {
-                WriteStatusPlain(ctx.AccountName, status, config, mode);
-            }
+                WriteStatusEntry(entry, mode);
 
             return status.Authenticated ? ExitCodes.Success : ExitCodes.AuthRequired;
         }
@@ -129,15 +128,7 @@ public class AuthCommands
         {
             foreach (var entry in entries)
             {
-                var defaultTag = entry.IsDefault ? " (default)" : "";
-                _output.WriteKeyValue([
-                    ("Account", $"{entry.Account}{defaultTag}"),
-                    ("Authenticated", entry.Authenticated.ToString()),
-                    ("Email", entry.Email ?? "(unknown)"),
-                    ("Token expires", entry.TokenExpiry.HasValue
-                        ? $"{entry.TokenExpiry.Value:u} ({(entry.TokenValid ? "valid" : "invalid")})"
-                        : "(n/a)")
-                ], mode);
+                WriteStatusEntry(entry, mode);
                 _output.WritePlain("");
             }
         }
@@ -145,17 +136,15 @@ public class AuthCommands
         return anyAuthenticated ? ExitCodes.Success : ExitCodes.AuthRequired;
     }
 
-    private void WriteStatusPlain(string accountName, AuthStatusResult status, AppConfig config, OutputMode mode)
+    private void WriteStatusEntry(AccountStatusEntry entry, OutputMode mode)
     {
-        var isDefault = accountName == (config.DefaultAccount ?? "default");
-        var defaultTag = isDefault ? " (default)" : "";
-
+        var defaultTag = entry.IsDefault ? " (default)" : "";
         _output.WriteKeyValue([
-            ("Account", $"{accountName}{defaultTag}"),
-            ("Authenticated", status.Authenticated.ToString()),
-            ("Email", status.Email ?? "(unknown)"),
-            ("Token expires", status.TokenExpiry.HasValue
-                ? $"{status.TokenExpiry.Value:u} ({(status.TokenValid ? "valid" : "invalid")})"
+            ("Account", $"{entry.Account}{defaultTag}"),
+            ("Authenticated", entry.Authenticated.ToString()),
+            ("Email", entry.Email ?? "(unknown)"),
+            ("Token expires", entry.TokenExpiry.HasValue
+                ? $"{entry.TokenExpiry.Value:u} ({(entry.TokenValid ? "valid" : "invalid")})"
                 : "(n/a)")
         ], mode);
     }

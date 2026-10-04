@@ -1,6 +1,5 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
-using NorthernRange.Config;
 using NorthernRange.Errors;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
@@ -11,22 +10,19 @@ namespace NorthernRange.Commands;
 
 public class LabelsCommands
 {
-    private readonly GmailClientFactory _gmailFactory;
     private readonly LabelService _labelService;
-    private readonly AccountResolver _resolver;
+    private readonly CommandPrelude _prelude;
     private readonly OutputWriter _output;
     private readonly ILogger<LabelsCommands> _logger;
 
     public LabelsCommands(
-        GmailClientFactory gmailFactory,
         LabelService labelService,
-        AccountResolver resolver,
+        CommandPrelude prelude,
         OutputWriter output,
         ILogger<LabelsCommands> logger)
     {
-        _gmailFactory = gmailFactory;
         _labelService = labelService;
-        _resolver = resolver;
+        _prelude = prelude;
         _output = output;
         _logger = logger;
     }
@@ -35,14 +31,12 @@ public class LabelsCommands
     [Command("list", Description = "List all labels, system and user-created. Use the IDs with --label on list commands.")]
     public async Task ListAsync(GlobalOptions globals)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "labels.list");
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "labels.list" });
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         var result = await _labelService.ListAsync(gmail);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -58,7 +52,7 @@ public class LabelsCommands
             l.MessagesUnread?.ToString() ?? "-"
         }).ToList();
 
-        _output.WriteTable(headers, rows, mode);
+        _output.WriteTable(headers, rows, session.Mode);
     }
 
     [ErrorHandlingFilter]
@@ -67,19 +61,13 @@ public class LabelsCommands
         GlobalOptions globals,
         [Argument(Description = "Label ID or display name. Get IDs from 'nr labels list'.")] string id)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "labels.show",
+            ("LabelId", id));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "labels.show",
-            ["LabelId"] = id
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         var label = await _labelService.GetAsync(gmail, id);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(label);
             return;
@@ -102,7 +90,7 @@ public class LabelsCommands
             items.Add(("Background", label.Color.BackgroundColor));
         }
 
-        _output.WriteKeyValue(items, mode);
+        _output.WriteKeyValue(items, session.Mode);
     }
 
     [ErrorHandlingFilter]
@@ -117,19 +105,13 @@ public class LabelsCommands
             throw new NrException(ExitCodes.InvalidArguments,
                 "Colors must be given as a pair. Use both --text-color and --bg-color, or neither.");
 
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "labels.create",
+            ("LabelName", name));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "labels.create",
-            ["LabelName"] = name
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         var label = await _labelService.CreateAsync(gmail, name, textColor, bgColor);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(label);
             return;
@@ -144,19 +126,13 @@ public class LabelsCommands
         GlobalOptions globals,
         [Argument(Description = "Label ID or display name. Get IDs from 'nr labels list'.")] string id)
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
+        using var session = _prelude.Begin(globals, _logger, "labels.delete",
+            ("LabelId", id));
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "labels.delete",
-            ["LabelId"] = id
-        });
-
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         await _labelService.DeleteAsync(gmail, id);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(new DeleteResult(true, id));
             return;

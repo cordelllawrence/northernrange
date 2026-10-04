@@ -130,6 +130,7 @@ try
             services.AddSingleton<AttachmentService>();
             services.AddSingleton<OutputWriter>();
             services.AddSingleton<SendService>();
+            services.AddSingleton<CommandPrelude>();
             services.AddSingleton<ICoconaHelpRenderer, NrHelpRenderer>();
             NrDispatchPipeline.Register(services);
         })

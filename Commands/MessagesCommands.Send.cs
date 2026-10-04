@@ -28,21 +28,15 @@ public partial class MessagesCommands
         if (string.IsNullOrWhiteSpace(subject))
             throw new NrException(ExitCodes.InvalidArguments, "Subject is empty. Use --subject <text>.");
 
-        var ctx  = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
-
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "messages.send",
-            ["To"]      = string.Join(", ", to)
-        });
+        using var session = _prelude.Begin(globals, _logger, "messages.send",
+            ("To", string.Join(", ", to)));
 
         var bodyText = await ResolveBodyAsync(body, bodyFile);
-        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail    = await session.GmailAsync();
         var result   = await _sendService.SendNewAsync(
             gmail, to, cc, bcc, subject, bodyText, attach, draft);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -64,21 +58,15 @@ public partial class MessagesCommands
         [Option("reply-all", Description = "CC all original recipients (To + Cc) in addition to the sender.")] bool replyAll = false,
         [Option("draft", Description = "Save as a draft instead of sending.")] bool draft = false)
     {
-        var ctx  = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
-
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"]   = "messages.reply",
-            ["MessageId"] = messageId
-        });
+        using var session = _prelude.Begin(globals, _logger, "messages.reply",
+            ("MessageId", messageId));
 
         var bodyText = await ResolveBodyAsync(body, bodyFile);
-        var gmail    = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail    = await session.GmailAsync();
         var result   = await _sendService.SendReplyAsync(
             gmail, messageId, bodyText, attach, replyAll, draft);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;

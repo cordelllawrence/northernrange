@@ -23,6 +23,14 @@ public class OutputWriter
     };
 
     public OutputMode DetermineMode(GlobalOptions globals, AppConfig config)
+        => DetermineMode(globals, config, Console.IsOutputRedirected, Console.Error);
+
+    // Testable overload: the stdout-redirected signal and the stderr sink are
+    // injected so platform-independent tests can exercise the --ui auto-disable
+    // branch without touching the real console. `Console.IsOutputRedirected` is
+    // provided by the BCL on both Windows and Unix (via isatty on POSIX), so a
+    // test over this method covers both.
+    internal OutputMode DetermineMode(GlobalOptions globals, AppConfig config, bool isOutputRedirected, TextWriter stderr)
     {
         var envJson = EnvVars.JsonRequested();
         if (globals.Json || config.DefaultOutputFormat == "json" || envJson)
@@ -30,10 +38,10 @@ public class OutputWriter
             ErrorOutput.JsonMode = true; // config may have chosen JSON after the startup scan
             return OutputMode.Json;
         }
-        if (globals.Ui && !Console.IsOutputRedirected)
+        if (globals.Ui && !isOutputRedirected)
             return OutputMode.RichUi;
-        if (globals.Ui && Console.IsOutputRedirected)
-            Console.Error.WriteLine("Warning: --ui flag ignored because stdout is redirected. Using plain text.");
+        if (globals.Ui && isOutputRedirected)
+            stderr.WriteLine("Warning: --ui flag ignored because stdout is redirected. Using plain text.");
         return OutputMode.PlainText;
     }
 

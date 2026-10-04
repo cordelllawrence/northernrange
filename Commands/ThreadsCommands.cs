@@ -1,6 +1,5 @@
 using Cocona;
 using Microsoft.Extensions.Logging;
-using NorthernRange.Config;
 using NorthernRange.Filters;
 using NorthernRange.Gmail;
 using NorthernRange.Output;
@@ -11,25 +10,22 @@ public class ThreadsCommands
 {
     public static readonly string[] ReadFormats = ["full", "metadata", "minimal"];
 
-    private readonly GmailClientFactory _gmailFactory;
     private readonly ThreadService _threadService;
     private readonly LabelService _labelService;
-    private readonly AccountResolver _resolver;
+    private readonly CommandPrelude _prelude;
     private readonly OutputWriter _output;
     private readonly ILogger<ThreadsCommands> _logger;
 
     public ThreadsCommands(
-        GmailClientFactory gmailFactory,
         ThreadService threadService,
         LabelService labelService,
-        AccountResolver resolver,
+        CommandPrelude prelude,
         OutputWriter output,
         ILogger<ThreadsCommands> logger)
     {
-        _gmailFactory = gmailFactory;
         _threadService = threadService;
         _labelService = labelService;
-        _resolver = resolver;
+        _prelude = prelude;
         _output = output;
         _logger = logger;
     }
@@ -43,21 +39,19 @@ public class ThreadsCommands
         [Option('n', Description = "Max threads to return (1-500). Default: 25.")] int? max = null,
         [Option("page-token", Description = "Pagination token from a previous list response.")] string? pageToken = null)
     {
-        var ctx = _resolver.Resolve(globals);
-        var effectiveLabel = label ?? ctx.Config.DefaultLabel;
-        var effectiveMax = max ?? ctx.Config.DefaultMaxResults;
+        using var session = _prelude.Begin(globals, _logger, "threads.list");
+
+        var effectiveLabel = label ?? session.Config.DefaultLabel;
+        var effectiveMax = max ?? session.Config.DefaultMaxResults;
         ParamValidation.RequireRange(effectiveMax, 1, 500, "max");
 
-        var mode = _output.DetermineMode(globals, ctx.Config);
-
-        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["Command"] = "threads.list" });
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
 
         // Resolve label name to ID (e.g. "Work/Projects" → "Label_18"), matching `messages list`
         var resolvedLabel = (await _labelService.GetAsync(gmail, effectiveLabel)).Id;
         var result = await _threadService.ListAsync(gmail, resolvedLabel, query, effectiveMax, pageToken);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(result);
             return;
@@ -79,7 +73,7 @@ public class ThreadsCommands
                 PlainTextRenderer.Truncate(t.Snippet, 80)
             }).ToList();
 
-            _output.WriteTable(headers, rows, mode);
+            _output.WriteTable(headers, rows, session.Mode);
         }
 
         if (!string.IsNullOrEmpty(result.NextPageToken))
@@ -94,20 +88,15 @@ public class ThreadsCommands
         [Argument(Description = "Gmail thread ID. Get from 'nr threads list'.")] string id,
         [Option("format", Description = "Detail level: 'full' (default) body text; 'metadata' headers only; 'minimal' IDs only.")] string format = "full")
     {
-        var ctx = _resolver.Resolve(globals);
-        var mode = _output.DetermineMode(globals, ctx.Config);
         format = ParamValidation.RequireOneOf(format, ReadFormats, "format");
 
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Command"] = "threads.read",
-            ["ThreadId"] = id
-        });
+        using var session = _prelude.Begin(globals, _logger, "threads.read",
+            ("ThreadId", id));
 
-        var gmail = await _gmailFactory.GetServiceAsync(ctx.CredentialsPath, ctx.TokenStorePath, ctx.Config.HttpTimeoutSeconds);
+        var gmail = await session.GmailAsync();
         var thread = await _threadService.GetAsync(gmail, id, format);
 
-        if (mode == OutputMode.Json)
+        if (session.Mode == OutputMode.Json)
         {
             _output.WriteJson(thread);
             return;
@@ -122,7 +111,7 @@ public class ThreadsCommands
             _output.WriteKeyValue([
                 ("From", msg.Headers.GetValueOrDefault("From", "")),
                 ("Date", msg.Headers.GetValueOrDefault("Date", ""))
-            ], mode);
+            ], session.Mode);
 
             if (msg.Body?.Text is not null)
             {
