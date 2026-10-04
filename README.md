@@ -1,21 +1,42 @@
 # northernrange (`nr`)
 
-A focused Gmail command-line interface built for programmatic use.
+An open-source CLI that gives **local AI agents and their harnesses** direct access to Gmail.
 
-`nr` is designed to be consumed by **AI agents and automated pipelines** as its primary audience, while remaining ergonomic for direct human use at a terminal. Every command produces stable, machine-parseable JSON output via `--json`. Human-readable output is a convenience layered on top.
+`nr` is a single binary, no server, no runtime dependencies: the agent's harness
+runs it like any other shell tool, the mailbox lives on the agent's own machine
+under the agent's own OAuth consent, and every command returns the same stable
+JSON an agent can parse. Human-readable output is a convenience layered on top.
+
+If you're wiring Gmail into Claude Code, Aider, Codex, or a custom agent loop,
+the goal is that `nr` fits beside `git`, `grep`, and `curl` — a plain tool the
+agent calls, with discoverable grammar and predictable exit codes.
 
 ---
 
 ## Why nr?
 
-Most Gmail tools are built around interactive UIs. `nr` is built around the opposite philosophy:
+Most Gmail tools are built as web apps or SaaS integrations. `nr` is a terminal
+tool first, aimed at agents second:
 
-- **Headless-first.** `--json` output is a stable contract. Agents and scripts can depend on it.
-- **Self-documenting.** `nr --llm` (and `--llm-full` / `--llm --json`) emits AI-consumable docs generated from the live command tree, so an agent can learn the CLI before using it.
-- **Safe by default.** Reads need no extra intent; sending, drafts, and label changes are explicit, separate commands. Permanent deletion of mail is intentionally not supported.
-- **No local state.** No caching, no local indexes. The only files written to disk are the OAuth2 token and a small cached profile (`user_info.json`), plus whatever you explicitly ask for with `--log` or `attachments download`.
-- **Composable.** List commands produce paginated JSON with `nextPageToken`. Output is pipe-friendly.
-- **Self-contained binary.** A single executable with no .NET runtime installation required on the target machine.
+- **Discoverable grammar.** `nr --llm` (and `--llm-full` / `--llm --json`) emits
+  the full command tree as AI-consumable documentation, generated from the live
+  code so it never drifts. An agent can learn the CLI from one call before
+  using it.
+- **Stable JSON on every command.** `--json` output is a contract — camelCase
+  fields, ISO-8601 timestamps, paginated with `nextPageToken`. Errors come
+  back as `{"error": {"code", "message"}}` on stderr so agents never have to
+  mix text and JSON streams.
+- **Precise exit codes.** 0 success, 2 bad input, 3 auth required, 4 not found,
+  5 remote error, 6 file error, 130 cancelled. One number tells the agent what
+  to retry, what to re-prompt the user for, and what to give up on.
+- **Safe by default.** Reads need no extra intent; sending, drafts, and label
+  changes are explicit, separate commands. Permanent deletion of mail is
+  intentionally not supported.
+- **No local state.** No caching, no local indexes. The only files written to
+  disk are the OAuth2 token and a small cached profile (`user_info.json`),
+  plus whatever you explicitly ask for with `--log` or `attachments download`.
+- **Single binary.** No .NET runtime on the target machine. Drops into a
+  harness's PATH the same way `rg` or `fd` does.
 
 ---
 

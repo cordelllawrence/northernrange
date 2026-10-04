@@ -17,10 +17,13 @@ spec in `journal/2026-03-02-requirements.md`.
 
 ## 1. What it is
 
-A Gmail command-line client whose **primary consumer is AI agents and scripts**,
-with humans as a first-class secondary audience. The contract surface is the
-`--json` output of every command; human-readable text and `--ui` (Spectre)
-tables are conveniences layered on top.
+An open-source CLI that gives **local AI agents and their harnesses** direct
+Gmail access. The agent runs `nr` as a shell tool from inside its harness
+(Claude Code, Aider, Codex, a custom loop); the mailbox lives on the agent's
+own machine under the agent's own OAuth consent; nothing routes through a
+hosted service. Humans at a terminal are a first-class secondary audience —
+the human-readable text and `--ui` (Spectre) tables are conveniences layered
+on the same JSON contract agents consume.
 
 Two features make the "agent-first" stance concrete:
 

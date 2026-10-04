@@ -429,11 +429,16 @@ Goal: everything around the code is current and single-sourced.
       Generate it from `nr --llm-full`, or add a test that diffs them.
 - [ ] `README.md`, `docs/USAGE.md`, `docs/ARCHITECTURE.md`, and the journal reviews overlap. Define
       what each one is for and remove duplication (exit-code table appears in three).
-- [ ] Reframe the project pitch. `README.md` and `docs/ARCHITECTURE.md` currently
+- [x] Reframe the project pitch. `README.md` and `docs/ARCHITECTURE.md` currently
       describe `nr` as a Gmail CLI; the intended positioning is an open-source CLI
       that gives local AI agents and their harnesses direct access to Gmail.
       Rewrite the lede, the "why" section, and the agent-facing hooks (`--llm`,
       JSON contracts, exit codes) through that lens. Raised 2026-10-03.
+      **Done 2026-10-04:** `README.md` lede now opens with "an open-source CLI
+      that gives local AI agents and their harnesses direct access to Gmail";
+      the "Why nr?" section leads with discoverable grammar (`--llm`), stable
+      JSON, and precise exit codes. `docs/ARCHITECTURE.md` §1 picks up the
+      same framing. Remaining lower-priority docs sweeps are still open above.
 - [x] **(seed)** `requirements.md` and `llm-documentation-plan.md` were gitignored yet
       referenced from tracked docs. Moved to `docs/journal/` and tracked, 2026-09-16.
 - [x] Docs layout: durable docs in `docs/`, dated plans and reviews in `docs/journal/`.
